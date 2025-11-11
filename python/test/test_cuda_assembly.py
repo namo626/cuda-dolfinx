@@ -130,6 +130,7 @@ def test_cuda_assembly():
     # now we need to compare the two
     compare_mats(Mat1, Mat2.mat)
 
+  print("PASSED")
 def test_reassembly():
   """Ensure correct assembly when coefficients are updated
   """
