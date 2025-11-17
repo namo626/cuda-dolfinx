@@ -8,6 +8,8 @@
 
 #include <cudolfinx/common/CUDA.h>
 #include <dolfinx/fem/Function.h>
+#include <dolfinx/fem/interpolate.h>
+#include <vector>
 
 namespace dolfinx::fem
 {
@@ -33,6 +35,21 @@ public:
     CUDA::safeMemcpyHtoD(_dvalues, (void*)(_x->array().data()), _dvalues_size);
   }
 
+  /// Compute physical interpolation points on host and copy to device
+  void init_interpolation()
+  {
+    auto fn_space = _f->function_space();
+    int tdim = fn_space->mesh()->topology()->dim();
+    auto cmap = fn_space->mesh()->topology()->index_map(tdim);
+    assert(cmap);
+
+    std::vector<std::int32_t> cells(cmap->size_local() + cmap->num_ghosts(), 0);
+    std::iota(cells.begin(), cells.end(), 0);
+
+    _interpolation_pts = dolfinx::fem::interpolation_coords(fn_space->element(), fn_space->mesh()->geometry(), cells);
+    CUDA::safeMemcpyHtoD(_interp_pts, (void*)(_interpolation_pts.data()), _interpolation_pts.size());
+  }
+
   /// Get pointer to vector data on device
   CUdeviceptr device_values() const
   {
@@ -55,6 +72,11 @@ private:
   std::shared_ptr<const dolfinx::fem::Function<T,U>> _f;
   // Pointer to host-side coefficient vector
   std::shared_ptr<const dolfinx::la::Vector<T>> _x;
+
+  // Host vector of interpolation coordinates
+  const std::vector<T> _interpolation_pts;
+  // Device-side interpolation coordinates
+  CUdeviceptr _interp_pts;
 };
 
 }
