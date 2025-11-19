@@ -46,8 +46,16 @@ public:
     std::vector<std::int32_t> cells(cmap->size_local() + cmap->num_ghosts(), 0);
     std::iota(cells.begin(), cells.end(), 0);
 
-    _interpolation_pts = dolfinx::fem::interpolation_coords(fn_space->element(), fn_space->mesh()->geometry(), cells);
-    CUDA::safeMemcpyHtoD(_interp_pts, (void*)(_interpolation_pts.data()), _interpolation_pts.size());
+    assert(fn_space->element());
+    assert(fn_space->mesh());
+
+    _interp_pts = dolfinx::fem::interpolation_coords<T>(
+        *fn_space->element(), fn_space->mesh()->geometry(), cells);
+    _dinterp_size = _interp_pts.size();
+
+    CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size);
+    CUDA::safeMemcpyHtoD(_dinterp_pts, (void *)(_interp_pts.data()),
+                         _dinterp_size);
   }
 
   /// Get pointer to vector data on device
@@ -60,6 +68,15 @@ public:
   {
     if (_dvalues)
       cuMemFree(_dvalues);
+
+    if (_dinterp_pts)
+      cuMemFree(_dinterp_pts);
+  }
+
+  /// Get pointer to device interpolation coordinates
+  CUdeviceptr interpolation_coords() const
+  {
+    return _dinterp_pts;
   }
 
 private:
@@ -74,9 +91,11 @@ private:
   std::shared_ptr<const dolfinx::la::Vector<T>> _x;
 
   // Host vector of interpolation coordinates
-  const std::vector<T> _interpolation_pts;
+  std::vector<T> _interp_pts;
   // Device-side interpolation coordinates
-  CUdeviceptr _interp_pts;
+  CUdeviceptr _dinterp_pts;
+  size_t _dinterp_size;
 };
 
+template class dolfinx::fem::CUDACoefficient<double>;
 }

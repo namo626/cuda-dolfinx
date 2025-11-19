@@ -8,7 +8,7 @@
 namespace dolfinx::CUDA {
 void interpolate(std::shared_ptr<const dolfinx::fem::Function<double, double>> F,
                  const std::function <
-                     std::pair<std::vector<double>, std::vector<std::size_t>>(
+                     std::pair<std::vector<double>, std::vector<std::size_t>>>(
                          double*, size_t) &f,
                  std::vector<double> interp_pts)
 {
