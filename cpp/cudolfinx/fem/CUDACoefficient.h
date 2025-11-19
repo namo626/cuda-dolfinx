@@ -60,6 +60,8 @@ public:
 
     // Interpolation mask
     _interp_mask = CUDA::get_interpolate_mask(*_f,  {1, _dinterp_size}, cells);
+    CUDA::safeMemAlloc(&_dinterp_mask, _interp_mask.size());
+    CUDA::safeMemcpyHtoD(_dinterp_mask, (void *)(_interp_mask.data()), _interp_mask.size());
   }
 
   /// Get pointer to vector data on device
@@ -79,6 +81,11 @@ public:
     return _interp_mask;
   }
 
+  CUdeviceptr device_interp_mask() const
+  {
+    return _dinterp_mask;
+  }
+
 
   ~CUDACoefficient()
   {
@@ -87,6 +94,9 @@ public:
 
     if (_dinterp_pts)
       cuMemFree(_dinterp_pts);
+
+    if (_dinterp_mask)
+      cuMemFree(_dinterp_mask);
   }
 
 private:
@@ -108,6 +118,7 @@ private:
 
   // Interpolation DOF map
   std::vector<int> _interp_mask;
+  CUdeviceptr _dinterp_mask;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;
