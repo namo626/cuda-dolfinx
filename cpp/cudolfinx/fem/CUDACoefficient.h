@@ -10,6 +10,7 @@
 #include <dolfinx/fem/Function.h>
 #include <dolfinx/fem/interpolate.h>
 #include <vector>
+#include <cudolfinx/fem/CUDAInterpolate.h>
 
 namespace dolfinx::fem
 {
@@ -21,7 +22,7 @@ class CUDACoefficient
 public:
   
   /// @brief Construct a new CUDACoefficient
-  CUDACoefficient(std::shared_ptr<const Function<T, U>> f) {
+  CUDACoefficient(std::shared_ptr<Function<T, U>> f) {
     _f = f;
     _x = f->x();
     _dvalues_size = _x->bs() * (_x->index_map()->size_local()+_x->index_map()->num_ghosts()) * sizeof(T);
@@ -56,6 +57,9 @@ public:
     CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size);
     CUDA::safeMemcpyHtoD(_dinterp_pts, (void *)(_interp_pts.data()),
                          _dinterp_size);
+
+    // Interpolation mask
+    _interp_mask = CUDA::get_interpolate_mask(*_f,  {1, _dinterp_size}, cells);
   }
 
   /// Get pointer to vector data on device
@@ -63,6 +67,18 @@ public:
   {
     return _dvalues;
   }
+
+  /// Get pointer to device interpolation coordinates
+  CUdeviceptr interpolation_coords() const
+  {
+    return _dinterp_pts;
+  }
+
+  std::vector<int> interp_mask() const
+  {
+    return _interp_mask;
+  }
+
 
   ~CUDACoefficient()
   {
@@ -73,12 +89,6 @@ public:
       cuMemFree(_dinterp_pts);
   }
 
-  /// Get pointer to device interpolation coordinates
-  CUdeviceptr interpolation_coords() const
-  {
-    return _dinterp_pts;
-  }
-
 private:
 
   // Device-side coefficient array
@@ -86,7 +96,7 @@ private:
   // Size of coefficient array
   size_t _dvalues_size;
   // Pointer to host-side Function
-  std::shared_ptr<const dolfinx::fem::Function<T,U>> _f;
+  std::shared_ptr<dolfinx::fem::Function<T,U>> _f;
   // Pointer to host-side coefficient vector
   std::shared_ptr<const dolfinx::la::Vector<T>> _x;
 
@@ -95,6 +105,9 @@ private:
   // Device-side interpolation coordinates
   CUdeviceptr _dinterp_pts;
   size_t _dinterp_size;
+
+  // Interpolation DOF map
+  std::vector<int> _interp_mask;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

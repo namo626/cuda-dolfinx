@@ -9,10 +9,10 @@
 
 namespace dolfinx::CUDA {
 
-void interpolate(std::shared_ptr<const dolfinx::fem::Function<double, double>> F,
-                 const std::function <
-                     std::pair<std::vector<double>, std::vector<std::size_t>>>(
-                         double*,  size_t) &f );
+template <dolfinx::scalar T, std::floating_point U>
+std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>&, 
+                 std::array<std::size_t, 2>,
+                 std::span<std::int32_t>);
 }
 
 #endif // CUDAINTERPOLATE_H_

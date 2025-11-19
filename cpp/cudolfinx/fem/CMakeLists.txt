@@ -7,7 +7,7 @@ set(HEADERS_fem
     ${CMAKE_CURRENT_SOURCE_DIR}/CUDAFormConstants.h
     ${CMAKE_CURRENT_SOURCE_DIR}/CUDAFormCoefficients.h
     ${CMAKE_CURRENT_SOURCE_DIR}/CUDAFormIntegral.h
-    #${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.h
     ${CMAKE_CURRENT_SOURCE_DIR}/petsc.h
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.h
     PARENT_SCOPE
@@ -18,5 +18,5 @@ target_sources(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/CUDAAssembler.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/CUDADofMap.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/CUDAFormIntegral.cpp
-          #${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.cpp
 )
