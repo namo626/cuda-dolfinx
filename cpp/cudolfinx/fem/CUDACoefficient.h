@@ -50,18 +50,26 @@ public:
     assert(fn_space->element());
     assert(fn_space->mesh());
 
+    // Interpolation coordinates
     _interp_pts = dolfinx::fem::interpolation_coords<T>(
         *fn_space->element(), fn_space->mesh()->geometry(), cells);
     _dinterp_size = _interp_pts.size();
 
-    CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size);
+    CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size*sizeof(T));
     CUDA::safeMemcpyHtoD(_dinterp_pts, (void *)(_interp_pts.data()),
-                         _dinterp_size);
+                         _dinterp_size*sizeof(T));
+
+    // Set view of x,y,z coordinates
+    T* tmp = (T*) _dinterp_pts;
+    _dxs = &tmp[0];
+    _dys = &tmp[_dinterp_size];
+    _dzs = &tmp[2*_dinterp_size];
 
     // Interpolation mask
     _interp_mask = CUDA::get_interpolate_mask(*_f,  {1, _dinterp_size}, cells);
-    CUDA::safeMemAlloc(&_dinterp_mask, _interp_mask.size());
-    CUDA::safeMemcpyHtoD(_dinterp_mask, (void *)(_interp_mask.data()), _interp_mask.size());
+    CUDA::safeMemAlloc(&_dinterp_mask, _interp_mask.size()*sizeof(int));
+    CUDA::safeMemcpyHtoD(_dinterp_mask, (void *)(_interp_mask.data()),
+                         _interp_mask.size() * sizeof(int));
   }
 
   /// Interpolate a scalar function which accepts a vector of coordinates
@@ -74,10 +82,23 @@ public:
     CUDA::interpolate(*_f, _interp_mask, g_eval);
   }
 
+  void interpolate_square() {
+    CUDA::cuda_wrapper_interpolate(_dvalues_size/sizeof(T), _dinterp_size, _dxs, _dys, _dzs,
+                                   (int*)_dinterp_mask, (T*)_dvalues);
+  }
+
   /// Get pointer to vector data on device
   CUdeviceptr device_values() const
   {
     return _dvalues;
+  }
+
+  /// Copy device coefficient array to host, and return.
+  std::vector<T> device_to_host_values() const
+  {
+    std::vector<T> dvalues(_dvalues_size/sizeof(T));
+    CUDA::safeMemcpyDtoH(dvalues.data(), _dvalues, _dvalues_size);
+    return dvalues;
   }
 
   /// Get pointer to device interpolation coordinates
@@ -124,6 +145,7 @@ private:
   std::vector<T> _interp_pts;
   // Device-side interpolation coordinates
   CUdeviceptr _dinterp_pts;
+  T *_dxs, *_dys, *_dzs;
   size_t _dinterp_size;
 
   // Interpolation DOF map

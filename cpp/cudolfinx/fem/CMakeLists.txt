@@ -19,4 +19,5 @@ target_sources(
           ${CMAKE_CURRENT_SOURCE_DIR}/CUDADofMap.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/CUDAFormIntegral.cpp
           ${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/CUDAInterpolate.cu
 )
