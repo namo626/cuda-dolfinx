@@ -64,6 +64,16 @@ public:
     CUDA::safeMemcpyHtoD(_dinterp_mask, (void *)(_interp_mask.data()), _interp_mask.size());
   }
 
+  /// Interpolate a scalar function which accepts a vector of coordinates
+  /// with shape (3, num_points)
+  void interpolate(std::function<std::vector<T>(std::vector<T>&)> g)
+  {
+    std::vector<T> g_eval = g(_interp_pts);
+    assert(g_eval.size() == _interp_pts.size() / 3);
+
+    CUDA::interpolate(*_f, _interp_mask, g_eval);
+  }
+
   /// Get pointer to vector data on device
   CUdeviceptr device_values() const
   {

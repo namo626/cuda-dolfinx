@@ -10,6 +10,17 @@
 namespace dolfinx::CUDA {
 
 template <dolfinx::scalar T, std::floating_point U>
+void interpolate(dolfinx::fem::Function<T, U> &u, const std::vector<int> &mask,
+                 const std::vector<T>& f)
+{
+  std::span<T> coeffs = u.x()->mutable_array();
+
+  for (std::size_t i = 0; i < coeffs.size(); i++) {
+    coeffs[i] = f[mask[i]];
+  }
+}
+
+template <dolfinx::scalar T, std::floating_point U>
 std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>& u,
                  std::array<std::size_t, 2> fshape,
                  std::span<std::int32_t> cells)
@@ -108,4 +119,7 @@ get_interpolate_mask<double, double>(dolfinx::fem::Function<double, double> &,
                                      std::array<std::size_t, 2>,
                                      std::span<std::int32_t>);
 
+template void
+interpolate<double, double>(dolfinx::fem::Function<double, double> &,
+                            const std::vector<int> &, const std::vector<double>&);
 } // namespace dolfinx::CUDA
