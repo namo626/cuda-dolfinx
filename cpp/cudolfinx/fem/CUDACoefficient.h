@@ -9,6 +9,8 @@
 #include <cudolfinx/common/CUDA.h>
 #include <dolfinx/fem/Function.h>
 #include <dolfinx/fem/interpolate.h>
+#include <memory>
+#include <span>
 #include <vector>
 #include <cudolfinx/fem/CUDAInterpolate.h>
 
@@ -28,6 +30,7 @@ public:
     _dvalues_size = _x->bs() * (_x->index_map()->size_local()+_x->index_map()->num_ghosts()) * sizeof(T);
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
     copy_host_values_to_device();
+    init_interpolation();
   }
 
   /// Copy to device, allocating GPU memory if required
@@ -53,21 +56,23 @@ public:
     // Interpolation coordinates
     _interp_pts = dolfinx::fem::interpolation_coords<T>(
         *fn_space->element(), fn_space->mesh()->geometry(), cells);
-    _dinterp_size = _interp_pts.size();
+    _num_interp_pts = _interp_pts.size() / 3;
+    _dinterp_size = _interp_pts.size() * sizeof(T); // bytes
 
-    CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size*sizeof(T));
+    CUDA::safeMemAlloc(&_dinterp_pts, _dinterp_size);
     CUDA::safeMemcpyHtoD(_dinterp_pts, (void *)(_interp_pts.data()),
-                         _dinterp_size*sizeof(T));
+                         _dinterp_size);
 
     // Set view of x,y,z coordinates
     T* tmp = (T*) _dinterp_pts;
     _dxs = &tmp[0];
-    _dys = &tmp[_dinterp_size];
-    _dzs = &tmp[2*_dinterp_size];
+    _dys = &tmp[_num_interp_pts];
+    _dzs = &tmp[2*_num_interp_pts];
 
     // Interpolation mask
-    _interp_mask = CUDA::get_interpolate_mask(*_f,  {1, _dinterp_size}, cells);
-    CUDA::safeMemAlloc(&_dinterp_mask, _interp_mask.size()*sizeof(int));
+    _interp_mask = CUDA::get_interpolate_mask(
+        *_f, {(std::size_t)fn_space->value_size(), _num_interp_pts}, cells);
+    CUDA::safeMemAlloc(&_dinterp_mask, _interp_mask.size() * sizeof(int));
     CUDA::safeMemcpyHtoD(_dinterp_mask, (void *)(_interp_mask.data()),
                          _interp_mask.size() * sizeof(int));
   }
@@ -77,13 +82,14 @@ public:
   void interpolate(std::function<std::vector<T>(std::vector<T>&)> g)
   {
     std::vector<T> g_eval = g(_interp_pts);
-    assert(g_eval.size() == _interp_pts.size() / 3);
+    //assert(g_eval.size() == _interp_pts.size() / 3);
 
     CUDA::interpolate(*_f, _interp_mask, g_eval);
   }
 
-  void interpolate_square() {
-    CUDA::cuda_wrapper_interpolate(_dvalues_size/sizeof(T), _dinterp_size, _dxs, _dys, _dzs,
+  /// Test interpolating 1 + x^2 + y^2 + z^2
+  void cuda_interpolate_test() {
+    CUDA::cuda_wrapper_interpolate(_dvalues_size/sizeof(T), _num_interp_pts, _dxs, _dys, _dzs,
                                    (int*)_dinterp_mask, (T*)_dvalues);
   }
 
@@ -93,29 +99,21 @@ public:
     return _dvalues;
   }
 
-  /// Copy device coefficient array to host, and return.
-  std::vector<T> device_to_host_values() const
-  {
-    std::vector<T> dvalues(_dvalues_size/sizeof(T));
-    CUDA::safeMemcpyDtoH(dvalues.data(), _dvalues, _dvalues_size);
-    return dvalues;
+
+  /// Copy device coefficient array to host, then return.
+  std::shared_ptr<const dolfinx::la::Vector<T>> x() const {
+    std::vector<T> coeffs(_dvalues_size/sizeof(T));
+    CUDA::safeMemcpyDtoH(coeffs.data(), _dvalues, _dvalues_size);
+    _x->array() = coeffs;
+    return _x;
   }
 
-  /// Get pointer to device interpolation coordinates
-  CUdeviceptr interpolation_coords() const
-  {
-    return _dinterp_pts;
-  }
 
   std::vector<int> interp_mask() const
   {
     return _interp_mask;
   }
 
-  CUdeviceptr device_interp_mask() const
-  {
-    return _dinterp_mask;
-  }
 
 
   ~CUDACoefficient()
@@ -139,16 +137,20 @@ private:
   // Pointer to host-side Function
   std::shared_ptr<dolfinx::fem::Function<T,U>> _f;
   // Pointer to host-side coefficient vector
-  std::shared_ptr<const dolfinx::la::Vector<T>> _x;
+  std::shared_ptr<dolfinx::la::Vector<T>> _x;
 
-  // Host vector of interpolation coordinates
+  // Number of interpolation points
+  size_t _num_interp_pts;
+  // Host vector of interpolation coordinates with shape (3, num_points)
   std::vector<T> _interp_pts;
   // Device-side interpolation coordinates
   CUdeviceptr _dinterp_pts;
-  T *_dxs, *_dys, *_dzs;
+  // Size of interpolation coordinate vector in bytes
   size_t _dinterp_size;
+  // Device pointers to x, y, z slices of _dinterp_pts
+  T *_dxs, *_dys, *_dzs;
 
-  // Interpolation DOF map
+  // Interpolation DOF map. 
   std::vector<int> _interp_mask;
   CUdeviceptr _dinterp_mask;
 };

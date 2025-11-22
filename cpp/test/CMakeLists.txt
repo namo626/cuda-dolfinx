@@ -30,12 +30,17 @@ endif()
 find_package(CUDAToolkit REQUIRED)
 
 
-add_executable(${PROJECT_NAME} interpolate.cpp)
+add_executable(interpolate_1d interpolate.cpp)
+add_executable(interpolate_3d interpolate_3d.cpp)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_CXX)
-target_link_libraries(${PROJECT_NAME} PRIVATE dolfinx)
-target_link_libraries(${PROJECT_NAME} PRIVATE cudolfinx)
-target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cuda_driver CUDA::nvrtc CUDA::cupti)
+function(link_interpolate name)
+  target_link_libraries(${name} PRIVATE MPI::MPI_CXX)
+  target_link_libraries(${name} PRIVATE dolfinx)
+  target_link_libraries(${name} PRIVATE cudolfinx)
+  target_link_libraries(${name} PRIVATE CUDA::cuda_driver CUDA::nvrtc CUDA::cupti)
+endfunction()
 
+link_interpolate(interpolate_1d)
+link_interpolate(interpolate_3d)
 
 

@@ -5,6 +5,7 @@
 #include <dolfinx/mesh/Geometry.h>
 #include <dolfinx/fem/interpolate.h>
 #include <numeric>
+#include <stdexcept>
 #include <vector>
 
 namespace dolfinx::CUDA {
@@ -55,10 +56,6 @@ std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>& u,
   }
 
   const std::size_t f_shape1 = fshape[1];
-  //const std::size_t f_shape1 = f.size() / u.function_space()->value_size();
-  // MDSPAN_IMPL_STANDARD_NAMESPACE::mdspan<
-  //     const T, MDSPAN_IMPL_STANDARD_NAMESPACE::dextents<std::size_t, 2>>
-  //     _f(f.data(), fshape);
 
   // Get dofmap
   const auto dofmap = u.function_space()->dofmap();
@@ -79,10 +76,6 @@ std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>& u,
   if (element->map_ident() && element->interpolation_ident()) {
     // Point evaluation element *and* the geometric map is the identity,
     // e.g. not Piola mapped
-
-    // auto apply_inv_transpose_dof_transformation =
-    //     element->template dof_transformation_fn<T>(
-    //         dolfinx::fem::doftransform::inverse_transpose, true);
     auto apply_inv_transpose_dof_transformation_int =
         element->template dof_transformation_fn<int>(
             dolfinx::fem::doftransform::inverse_transpose, true);
@@ -96,7 +89,7 @@ std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>& u,
         // cell in this case (interpolation matrix is identity)
         // std::copy_n(std::next(f.begin(), k * f_shape1 + c * num_scalar_dofs),
         //             num_scalar_dofs, _coeffs.begin());
-        std::iota(cell_perm.begin(), cell_perm.end(), c*num_scalar_dofs);
+        std::iota(cell_perm.begin(), cell_perm.end(), k * f_shape1 + c*num_scalar_dofs);
 
         //apply_inv_transpose_dof_transformation(_coeffs, cell_info, cell, 1);
         apply_inv_transpose_dof_transformation_int(cell_perm, cell_info, cell, 1);
@@ -109,6 +102,8 @@ std::vector<int> get_interpolate_mask(dolfinx::fem::Function<T, U>& u,
         }
       }
     }
+  } else {
+    throw std::runtime_error("Interpolation is currently only supported for non Piola-mapped elements.");
   }
 
   return dof_mask;
