@@ -11,9 +11,40 @@
 namespace dolfinx::CUDA {
 
 template <dolfinx::scalar T, std::floating_point U>
+std::vector<T> basis_expand(const dolfinx::fem::Function<T, U> &u,
+                            const std::vector<T> &basis_values,
+                            const std::vector<int>& cells) {
+
+  auto _function_space = u.function_space();
+  auto element = _function_space->element();
+  assert(element);
+  const int bs_element = element->block_size();
+  const std::size_t reference_value_size =
+      element->reference_value_size() / bs_element;
+  const std::size_t value_size = _function_space->value_size() / bs_element;
+  const std::size_t space_dimension = element->space_dimension() / bs_element; // no. of DOF
+
+  assert(basis_values.size() == space_dimension*value_size*cells.size());
+
+  std::vector<T> u(cells.size() * value_size);
+
+  for (std::size_t p = 0; p < cells.size(); ++p) {
+    std::span<const std::int32_t> dofs = dofmap->cell_dofs(cell_index);
+    for (std::size_t i = 0; i < space_dimension; ++i) {
+      auto coeff = u.x()[dofs[i]];
+      for (std::size_t j = 0; j < value_size; ++j) {
+        u[p * ushape[1] + (j * bs_element + k)] +=
+          coeff * basis_values((i * value_size + j) * space_dimension + p);
+      }
+    }
+  }
+
+  return u;
+}
+
+template <dolfinx::scalar T, std::floating_point U>
 void interpolate(dolfinx::fem::Function<T, U> &u, const std::vector<int> &mask,
-                 const std::vector<T>& f)
-{
+                 const std::vector<T> &f) {
   std::span<T> coeffs = u.x()->mutable_array();
 
   for (std::size_t i = 0; i < coeffs.size(); i++) {
