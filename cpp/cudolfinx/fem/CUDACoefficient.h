@@ -31,6 +31,8 @@ public:
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
     copy_host_values_to_device();
     init_interpolation();
+
+    _basis_values = {};
   }
 
   /// Copy to device, allocating GPU memory if required
@@ -93,39 +95,29 @@ public:
                                    (int*)_dinterp_mask, (T*)_dvalues);
   }
 
-  /// Evaluate AND store the reference basis functions at coordinates values x
-  void eval_reference_basis(std::span<const T> x,
-                            std::array<std::size_t, 2> xshape,
-                            std::span<const std::int32_t> cells) {
-
-    _basis_values = CUDA::eval_reference_basis(*_f, x, xshape, cells);
+  /// Evaluate the function at given coordinates x
+  std::vector<T> eval(std::span<const T> x, std::array<std::size_t, 2> xshape,
+            const std::vector<int>& cells) {
+    if (_basis_values.empty()) {
+      _basis_values = CUDA::eval_reference_basis(*_f, x, xshape, cells);
+    }
+    return CUDA::basis_expand(*_f, _basis_values, cells);
   }
 
   /// Get pointer to vector data on device
-  CUdeviceptr device_values() const
-  {
-    return _dvalues;
-  }
-
+  CUdeviceptr device_values() const { return _dvalues; }
 
   /// Copy device coefficient array to host, then return.
   std::shared_ptr<const dolfinx::la::Vector<T>> x() const {
-    std::vector<T> coeffs(_dvalues_size/sizeof(T));
+    std::vector<T> coeffs(_dvalues_size / sizeof(T));
     CUDA::safeMemcpyDtoH(coeffs.data(), _dvalues, _dvalues_size);
     _x->array() = coeffs;
     return _x;
   }
 
+  std::vector<int> interp_mask() const { return _interp_mask; }
 
-  std::vector<int> interp_mask() const
-  {
-    return _interp_mask;
-  }
-
-
-
-  ~CUDACoefficient()
-  {
+  ~CUDACoefficient() {
     if (_dvalues)
       cuMemFree(_dvalues);
 
@@ -136,35 +128,34 @@ public:
       cuMemFree(_dinterp_mask);
   }
 
-private:
+  private:
+    // Device-side coefficient array
+    CUdeviceptr _dvalues;
+    // Size of coefficient array
+    size_t _dvalues_size;
+    // Pointer to host-side Function
+    std::shared_ptr<dolfinx::fem::Function<T, U>> _f;
+    // Pointer to host-side coefficient vector
+    std::shared_ptr<dolfinx::la::Vector<T>> _x;
 
-  // Device-side coefficient array
-  CUdeviceptr _dvalues;
-  // Size of coefficient array
-  size_t _dvalues_size;
-  // Pointer to host-side Function
-  std::shared_ptr<dolfinx::fem::Function<T,U>> _f;
-  // Pointer to host-side coefficient vector
-  std::shared_ptr<dolfinx::la::Vector<T>> _x;
+    // Number of interpolation points
+    size_t _num_interp_pts;
+    // Host vector of interpolation coordinates with shape (3, num_points)
+    std::vector<T> _interp_pts;
+    // Device-side interpolation coordinates
+    CUdeviceptr _dinterp_pts;
+    // Size of interpolation coordinate vector in bytes
+    size_t _dinterp_size;
+    // Device pointers to x, y, z slices of _dinterp_pts
+    T *_dxs, *_dys, *_dzs;
 
-  // Number of interpolation points
-  size_t _num_interp_pts;
-  // Host vector of interpolation coordinates with shape (3, num_points)
-  std::vector<T> _interp_pts;
-  // Device-side interpolation coordinates
-  CUdeviceptr _dinterp_pts;
-  // Size of interpolation coordinate vector in bytes
-  size_t _dinterp_size;
-  // Device pointers to x, y, z slices of _dinterp_pts
-  T *_dxs, *_dys, *_dzs;
+    // Interpolation DOF map.
+    std::vector<int> _interp_mask;
+    CUdeviceptr _dinterp_mask;
 
-  // Interpolation DOF map. 
-  std::vector<int> _interp_mask;
-  CUdeviceptr _dinterp_mask;
-
-  // Reference basis evaluations at previously given coordinate points
-  std::vector<T> _basis_values;
-};
+    // Reference basis evaluations at previously given coordinate points
+    std::vector<T> _basis_values;
+  };
 
 template class dolfinx::fem::CUDACoefficient<double>;
 }

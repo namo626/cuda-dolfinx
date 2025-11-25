@@ -26,6 +26,10 @@ template <dolfinx::scalar T, std::floating_point U>
 std::vector<T> eval_reference_basis(const dolfinx::fem::Function<T, U> &f,
           std::span<const T> x, std::array<std::size_t, 2> xshape,
           std::span<const std::int32_t> cells);
+template <dolfinx::scalar T, std::floating_point U>
+std::vector<T> basis_expand(const dolfinx::fem::Function<T, U> &f,
+                            const std::vector<T> &basis_values,
+                            const std::vector<int>& cells);
 }
 
 #endif // CUDAINTERPOLATE_H_

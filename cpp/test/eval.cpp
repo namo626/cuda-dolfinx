@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
   const int num_cells = 20;
   const T lower = 0.;
   const T upper = 100.;
-  const int num_evals = 100000;
+  const int num_evals = 500000;
 
   auto element = basix::create_element<T>(
                                           basix::element::family::P,
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Value size: " << value_size << std::endl;
   std::vector<T> u(num_evals * value_size);
 
-  const int ITER = 10;
+  const int ITER = 20;
   auto t1 = high_resolution_clock::now();
   for (int i = 0; i < ITER; i++) {
     f->eval(coords, {num_evals, 3}, cells, u, {num_evals, value_size});
@@ -154,7 +154,16 @@ int main(int argc, char* argv[]) {
   cuCtxCreate(&cuContext, 0, cuDevice);
 
   auto coeffs = dolfinx::fem::CUDACoefficient<double>(f_d) ;
-  coeffs.eval_reference_basis(coords, {num_evals,3}, cells);
+  // Initialize the basis values at coords
+  coeffs.eval(coords, {num_evals,3}, cells);
+
+  t1 = high_resolution_clock::now();
+  for (int i = 0; i < ITER; i++) {
+    coeffs.eval(coords, {num_evals,3}, cells);
+  }
+  t2 = high_resolution_clock::now();
+  ms = t2 - t1;
+  std::cout << "Avg eval time: " << ms.count()/(double)ITER << "ms" << std::endl;
 
   return 0;
 }

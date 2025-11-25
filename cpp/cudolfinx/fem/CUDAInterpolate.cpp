@@ -299,7 +299,7 @@ std::vector<T> basis_expand(const dolfinx::fem::Function<T, U> &f,
     for (std::size_t i = 0; i < space_dimension; ++i) {
       auto coeff = f.x()->array()[dofs[i]];
       for (std::size_t j = 0; j < value_size; ++j) {
-        u[p * cells.size() + (j)] +=
+        u[p * value_size + (j)] +=
           coeff * basis_values[(i * value_size + j) * space_dimension + p];
       }
     }
