@@ -6,6 +6,7 @@
 #include <utility>
 #include <memory>
 #include <dolfinx/fem/Function.h>
+#include <cudolfinx/fem/CUDADofMap.h>
 
 namespace dolfinx::CUDA {
 
@@ -30,6 +31,11 @@ template <dolfinx::scalar T, std::floating_point U>
 std::vector<T> basis_expand(const dolfinx::fem::Function<T, U> &f,
                             const std::vector<T> &basis_values,
                             const std::vector<int>& cells);
+
+template <dolfinx::scalar T, std::floating_point U>
+std::vector<T> cuda_basis_expand(const dolfinx::fem::Function<T, U> &f,
+                                 CUdeviceptr dofmap, CUdeviceptr coeffs,
+                                 CUdeviceptr dbasis_values, int num_cells); 
 }
 
 #endif // CUDAINTERPOLATE_H_
