@@ -93,6 +93,14 @@ public:
                                    (int*)_dinterp_mask, (T*)_dvalues);
   }
 
+  /// Evaluate AND store the reference basis functions at coordinates values x
+  void eval_reference_basis(std::span<const T> x,
+                            std::array<std::size_t, 2> xshape,
+                            std::span<const std::int32_t> cells) {
+
+    _basis_values = CUDA::eval_reference_basis(*_f, x, xshape, cells);
+  }
+
   /// Get pointer to vector data on device
   CUdeviceptr device_values() const
   {
@@ -153,6 +161,9 @@ private:
   // Interpolation DOF map. 
   std::vector<int> _interp_mask;
   CUdeviceptr _dinterp_mask;
+
+  // Reference basis evaluations at previously given coordinate points
+  std::vector<T> _basis_values;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

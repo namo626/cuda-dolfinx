@@ -21,6 +21,11 @@ void interpolate(dolfinx::fem::Function<T, U> &, const std::vector<int> &,
 void cuda_wrapper_interpolate(int dof_count, int num_points, const double *xs,
                               const double *ys, const double *zs, 
                               const int *mask, double *x);
+
+template <dolfinx::scalar T, std::floating_point U>
+std::vector<T> eval_reference_basis(const dolfinx::fem::Function<T, U> &f,
+          std::span<const T> x, std::array<std::size_t, 2> xshape,
+          std::span<const std::int32_t> cells);
 }
 
 #endif // CUDAINTERPOLATE_H_
