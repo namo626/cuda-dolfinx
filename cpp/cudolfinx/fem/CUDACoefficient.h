@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cudolfinx/common/CUDA.h>
+#include <cudolfinx/fem/CUDADofMap.h>
 #include <dolfinx/fem/Function.h>
 #include <dolfinx/fem/interpolate.h>
 #include <memory>
@@ -33,6 +34,9 @@ public:
     init_interpolation();
 
     _basis_values = {};
+
+    auto dofmap = _f->function_space()->dofmap();
+    _ddofmap = dolfinx::fem::CUDADofMap(*dofmap);
   }
 
   /// Copy to device, allocating GPU memory if required
@@ -96,7 +100,7 @@ public:
   }
 
   /// Evaluate the function at given coordinates x
-  std::vector<T> eval(const dolfinx::fem::CUDADofMap& dofmap, std::span<const T> x, std::array<std::size_t, 2> xshape,
+  std::vector<T> eval(std::span<const T> x, std::array<std::size_t, 2> xshape,
             const std::vector<int>& cells) {
     if (_basis_values.empty()) {
       _basis_values = CUDA::eval_reference_basis(*_f, x, xshape, cells);
@@ -104,8 +108,8 @@ public:
       CUDA::safeMemcpyHtoD(_dbasis_values, (void*)(_basis_values.data()),
                            _basis_values.size() * sizeof(T));
     }
-    //return CUDA::basis_expand(*_f, _basis_values, cells);
-    CUDA::cuda_basis_expand(*_f, dofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells.size());
+    return CUDA::basis_expand(*_f, _basis_values, cells);
+    //return CUDA::cuda_basis_expand(*_f, _ddofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells.size());
   }
 
   /// Get pointer to vector data on device
@@ -160,6 +164,8 @@ private:
   // Reference basis evaluations at previously given coordinate points
   std::vector<T> _basis_values;
   CUdeviceptr _dbasis_values;
+
+  dolfinx::fem::CUDADofMap _ddofmap;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

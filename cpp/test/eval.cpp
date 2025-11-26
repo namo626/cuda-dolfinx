@@ -19,6 +19,14 @@ using std::chrono::duration;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
+template<typename T, typename U>
+void allClose(const T& v1, const U& v2) {
+  assert(v1.size() == v2.size());
+  for (std::size_t i = 0; i < v1.size(); i++) {
+    assert(std::abs((v1[i] - v2[i])/(v1[i])) < 1e-8);
+  }
+}
+
 template<typename T>
 void printVec(const std::vector<T>& vec) {
   for (auto v : vec) {
@@ -67,7 +75,7 @@ int main(int argc, char* argv[]) {
   const int num_cells = 20;
   const T lower = 0.;
   const T upper = 100.;
-  const int num_evals = 500000;
+  const int num_evals = 100000;
 
   auto element = basix::create_element<T>(
                                           basix::element::family::P,
@@ -119,24 +127,21 @@ int main(int argc, char* argv[]) {
 
 
   //printVec(cells);
-
-
   f->interpolate(
       [](auto x) -> std::pair<std::vector<T>, std::vector<std::size_t>>
       {
         std::vector<T> f;
         for (std::size_t p = 0; p < x.extent(1); ++p)
         {
-          f.push_back(1 + x(0, p) * 0.1);
+          f.push_back(1 + 0.10*x(0,p)*x(0,p) + 0.2*x(1,p)*x(1,p) + 0.3*x(2,p)*x(2,p));
         }
 
         return {f, {f.size()}};
       });
-  const std::size_t value_size = f->function_space()->value_size();
-  std::cout << "Value size: " << value_size << std::endl;
-  std::vector<T> u(num_evals * value_size);
+  const int value_size = 1;
+  std::vector<T> u(num_evals );
 
-  const int ITER = 20;
+  const int ITER = 10;
   auto t1 = high_resolution_clock::now();
   for (int i = 0; i < ITER; i++) {
     f->eval(coords, {num_evals, 3}, cells, u, {num_evals, value_size});
@@ -154,8 +159,19 @@ int main(int argc, char* argv[]) {
   cuCtxCreate(&cuContext, 0, cuDevice);
 
   auto coeffs = dolfinx::fem::CUDACoefficient<double>(f_d) ;
+  coeffs.interpolate([](std::vector<double> x) -> std::vector<double> {
+    int num_pts = x.size() / 3;
+    std::vector<double> fs(num_pts);
+    for (std::size_t p = 0; p < num_pts; ++p) {
+      fs[p] = 1 + 0.10 * x[p] * x[p] + 0.20 * x[num_pts + p] * x[num_pts + p] +
+              0.3 * x[2 * num_pts + p] * x[2 * num_pts + p];
+    }
+    return fs;
+  });
+  std::vector<T> v;
   // Initialize the basis values at coords
-  coeffs.eval(coords, {num_evals,3}, cells);
+  v = coeffs.eval(coords, {num_evals,3}, cells);
+  allClose(u, v);
 
   t1 = high_resolution_clock::now();
   for (int i = 0; i < ITER; i++) {

@@ -57,8 +57,7 @@ void cuda_wrapper_interpolate(int dof_count, int num_points, const double *xs,
     cudaFree(d_evals);
 }
 
-template <dolfinx::scalar T, std::floating_point U>
-std::vector<T> cuda_basis_expand(const dolfinx::fem::Function<T, U> &f,
+std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, double> &f,
                                  CUdeviceptr dofmap, CUdeviceptr coeffs,
                                  CUdeviceptr dbasis_values, int num_cells) {
 
@@ -72,14 +71,14 @@ std::vector<T> cuda_basis_expand(const dolfinx::fem::Function<T, U> &f,
   const std::size_t space_dimension = element->space_dimension() / bs_element; // no. of DOF
 
 
-  std::vector<T> u(num_cells * value_size);
+  std::vector<double> u(num_cells * value_size);
   double* d_u;
   cudaMalloc((void**)&d_u, u.size()*sizeof(double));
 
-  _basis_expand<<<1,1>>>(num_cells, 1, space_dimension, value_size,
+  _basis_expand<<<num_cells/128+1, 128>>>(num_cells, 1, space_dimension, value_size,
                          d_u , (double*)coeffs, (double*)dbasis_values, (int*)dofmap);
 
-  cudaMemcpy(u, d_u, u.size()*sizeof(double), cudaMemcpyDeviceToHost);
+  cudaMemcpy(u.data(), d_u, u.size()*sizeof(double), cudaMemcpyDeviceToHost);
   cudaFree(d_u);
 
   return u;
