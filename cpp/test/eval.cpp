@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
   auto element = basix::create_element<T>(
                                           basix::element::family::P,
                                           basix::cell::type::tetrahedron,
-                                          3,
+                                          8,
                                           basix::element::lagrange_variant::equispaced,
                                           basix::element::dpc_variant::unset, false);
   const auto mesh = std::make_shared<mesh::Mesh<T>>(
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
   const int value_size = 1;
   std::vector<T> u(num_evals );
 
-  const int ITER = 10;
+  const int ITER = 5;
   auto t1 = high_resolution_clock::now();
   for (int i = 0; i < ITER; i++) {
     f->eval(coords, {num_evals, 3}, cells, u, {num_evals, value_size});
@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
     std::vector<double> fs(num_pts);
     for (std::size_t p = 0; p < num_pts; ++p) {
       fs[p] = 1 + 0.10 * x[p] * x[p] + 0.20 * x[num_pts + p] * x[num_pts + p] +
-              0.3 * x[2 * num_pts + p] * x[2 * num_pts + p];
+              0.30 * x[2 * num_pts + p] * x[2 * num_pts + p];
     }
     return fs;
   });

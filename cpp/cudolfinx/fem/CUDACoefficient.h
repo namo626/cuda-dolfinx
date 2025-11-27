@@ -91,6 +91,7 @@ public:
     //assert(g_eval.size() == _interp_pts.size() / 3);
 
     CUDA::interpolate(*_f, _interp_mask, g_eval);
+    copy_host_values_to_device();
   }
 
   /// Test interpolating 1 + x^2 + y^2 + z^2
@@ -108,8 +109,12 @@ public:
       CUDA::safeMemcpyHtoD(_dbasis_values, (void*)(_basis_values.data()),
                            _basis_values.size() * sizeof(T));
     }
-    return CUDA::basis_expand(*_f, _basis_values, cells);
-    //return CUDA::cuda_basis_expand(*_f, _ddofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells.size());
+    //return CUDA::basis_expand(*_f, _basis_values, cells);
+    auto space_dimension = _f->function_space()->element()->space_dimension(); // no. of DOF
+    //std::cout << "dofmap num_dofs: " << _ddofmap.num_dofs() << std::endl;
+    //std::cout << "actual dofs" << cells.size()*space_dimension << std::endl;
+    //assert(_ddofmap.num_dofs() == space_dimension*cells.size());
+    return CUDA::cuda_basis_expand(*_f, _ddofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells);
   }
 
   /// Get pointer to vector data on device
@@ -166,6 +171,7 @@ private:
   CUdeviceptr _dbasis_values;
 
   dolfinx::fem::CUDADofMap _ddofmap;
+  CUdeviceptr _dunrolled_dofs;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

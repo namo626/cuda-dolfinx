@@ -21,15 +21,17 @@ __global__ void cuda_copy_interpolate(int dof_count, double *x, const int *mask,
   }
 }
 
-__global__ void _basis_expand(int num_cells, int bs_element, int space_dimension,
+__global__ void _basis_expand(int num_cells, const int* cells, int bs_element, int space_dimension,
                             int value_size, double* u,
                             double* coeffs, double* basis_values_p, int* dofmap)
 {
   int p = blockIdx.x * blockDim.x + threadIdx.x;
   if (p < num_cells) {
+      u[p] = 0.;
+      int cell_ind = cells[p];
     for (int k = 0; k < bs_element; ++k) {
       for (std::size_t i = 0; i < space_dimension; ++i) {
-        int coeff_ind = dofmap[p * space_dimension + i];
+        int coeff_ind = dofmap[cell_ind * space_dimension + i];
         for (std::size_t j = 0; j < value_size; ++j) {
           u[p * value_size + (j * bs_element + k)] +=
               coeffs[coeff_ind] *
@@ -59,8 +61,9 @@ void cuda_wrapper_interpolate(int dof_count, int num_points, const double *xs,
 
 std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, double> &f,
                                  CUdeviceptr dofmap, CUdeviceptr coeffs,
-                                 CUdeviceptr dbasis_values, int num_cells) {
+                                 CUdeviceptr dbasis_values, const std::vector<int>& cells) {
 
+    const int num_cells = cells.size();
   auto _function_space = f.function_space();
   auto element = _function_space->element();
   assert(element);
@@ -73,13 +76,17 @@ std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, doubl
 
   std::vector<double> u(num_cells * value_size);
   double* d_u;
+  int* d_cells;
   cudaMalloc((void**)&d_u, u.size()*sizeof(double));
+  cudaMalloc((void**)&d_cells, cells.size()*sizeof(int));
+  cudaMemcpy(d_cells, cells.data(), cells.size()*sizeof(int), cudaMemcpyHostToDevice);
 
-  _basis_expand<<<num_cells/128+1, 128>>>(num_cells, 1, space_dimension, value_size,
+  _basis_expand<<<num_cells/128+1, 128>>>(num_cells, d_cells, 1, space_dimension, value_size,
                          d_u , (double*)coeffs, (double*)dbasis_values, (int*)dofmap);
 
   cudaMemcpy(u.data(), d_u, u.size()*sizeof(double), cudaMemcpyDeviceToHost);
   cudaFree(d_u);
+  cudaFree(d_cells);
 
   return u;
 }

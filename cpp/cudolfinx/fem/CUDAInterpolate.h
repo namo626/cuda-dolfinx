@@ -34,7 +34,7 @@ std::vector<T> basis_expand(const dolfinx::fem::Function<T, U> &f,
 
 std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double,double> &f,
                                  CUdeviceptr dofmap, CUdeviceptr coeffs,
-                                 CUdeviceptr dbasis_values, int num_cells); 
+                                 CUdeviceptr dbasis_values, const std::vector<int>& cells); 
 }
 
 #endif // CUDAINTERPOLATE_H_
