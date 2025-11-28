@@ -28,6 +28,7 @@ public:
   CUDACoefficient(std::shared_ptr<Function<T, U>> f) {
     _f = f;
     _x = f->x();
+    _g = nullptr;
     _dvalues_size = _x->bs() * (_x->index_map()->size_local()+_x->index_map()->num_ghosts()) * sizeof(T);
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
     copy_host_values_to_device();
@@ -117,6 +118,25 @@ public:
     return CUDA::cuda_basis_expand(*_f, _ddofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells);
   }
 
+  /// Interpolate a Function associated with the same mesh over all cells
+  void interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
+    if (_g != g) {
+      _g = g;
+      auto element0 = _g->function_space()->element();
+      assert(element0);
+      auto element1 = _f->function_space()->element();
+      assert(element1);
+
+      // Create interpolation operator
+      auto [x, y] = element1->create_interpolation_operator(*element0);
+      _i_m = x;
+      _im_shape = y;
+      std::cout << "im_shape[0] = " << _im_shape[0] << std::endl;
+      std::cout << "im_shape[1] = " << _im_shape[1] << std::endl;
+    }
+    CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape);
+  }
+
   /// Get pointer to vector data on device
   CUdeviceptr device_values() const { return _dvalues; }
 
@@ -172,6 +192,10 @@ private:
 
   dolfinx::fem::CUDADofMap _ddofmap;
   CUdeviceptr _dunrolled_dofs;
+
+  std::shared_ptr<dolfinx::fem::Function<T, U>> _g;
+  std::vector<T> _i_m;
+  std::array<std::size_t, 2> _im_shape;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;
