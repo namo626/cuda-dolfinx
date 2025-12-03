@@ -5,6 +5,7 @@
 #include <dolfinx/mesh/Geometry.h>
 #include <dolfinx/fem/interpolate.h>
 #include <numeric>
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -109,6 +110,39 @@ void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
                           std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
                           const std::vector<std::int32_t>& dofs0_map,
                           const std::vector<std::int32_t>& dofs1_map) {
+
+  auto V0 = u0.function_space();
+  auto V1 = u1.function_space();
+  auto mesh0 = V0->mesh();
+  const int tdim = mesh0->topology()->dim();
+  auto map = mesh0->topology()->index_map(tdim);
+
+  // Get all cells
+  std::vector<std::int32_t> cells(map->size_local() + map->num_ghosts(), 0);
+  const std::size_t P = im_shape[0];
+  const std::size_t K = im_shape[1];
+  const std::size_t C = cells.size();
+
+  std::vector<T> A(dofs0_map.size());
+  for (std::size_t i = 0; i < A.size(); i++) {
+    A[i] = u0.x()->array()[dofs0_map[i]];
+  }
+
+  std::vector<T> B(dofs1_map.size());
+
+  // B = M x A
+  for (std::size_t p = 0; p < P; p++) {
+    for (std::size_t k = 0; k < K; k++) {
+      for (std::size_t c = 0; c < C; c++) {
+        B[p * C + c] += i_m[p * K + k] * A[k * C + c];
+      }
+    }
+  }
+
+  //std::span<T> u = u1.x()->array();
+  for (std::size_t i = 0; i < B.size(); i++) {
+    u1.x()->mutable_array()[dofs1_map[i]] = B[i];
+  }
   
 }
 
