@@ -37,9 +37,18 @@ std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double,double
                                  CUdeviceptr dbasis_values, const std::vector<int>& cells); 
 
 template <dolfinx::scalar T, std::floating_point U>
+void create_interpolation_maps(const dolfinx::fem::Function<T, U>& u1,
+                          const dolfinx::fem::Function<T, U>& u0,
+                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
+                          std::vector<std::int32_t>& dofs0_map,
+                          std::vector<std::int32_t>& dofs1_map);
+
+template <dolfinx::scalar T, std::floating_point U>
 void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
                           dolfinx::fem::Function<T, U>& u0,
-                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape); 
+                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
+                          const std::vector<std::int32_t>& dofs0_map,
+                          const std::vector<std::int32_t>& dofs1_map);
 
 }
 

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cudolfinx/common/CUDA.h>
 #include <cudolfinx/fem/CUDADofMap.h>
 #include <dolfinx/fem/Function.h>
@@ -120,6 +121,7 @@ public:
 
   /// Interpolate a Function associated with the same mesh over all cells
   void interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
+    // If we haven't used this function before, need to initialize the necessary operators
     if (_g != g) {
       _g = g;
       auto element0 = _g->function_space()->element();
@@ -133,8 +135,12 @@ public:
       _im_shape = y;
       std::cout << "im_shape[0] = " << _im_shape[0] << std::endl;
       std::cout << "im_shape[1] = " << _im_shape[1] << std::endl;
+
+      // Create interpolation mappings once
+      CUDA::create_interpolation_maps(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
     }
-    CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape);
+
+    CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
   }
 
   /// Get pointer to vector data on device
@@ -196,6 +202,10 @@ private:
   std::shared_ptr<dolfinx::fem::Function<T, U>> _g;
   std::vector<T> _i_m;
   std::array<std::size_t, 2> _im_shape;
+
+  // Interpolation maps
+  std::vector<std::int32_t> _A_star;
+  std::vector<std::int32_t> _B_star;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

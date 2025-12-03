@@ -11,9 +11,11 @@
 namespace dolfinx::CUDA {
 
 template <dolfinx::scalar T, std::floating_point U>
-void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
-                          dolfinx::fem::Function<T, U>& u0,
-                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape) {
+void create_interpolation_maps(const dolfinx::fem::Function<T, U>& u1,
+                          const dolfinx::fem::Function<T, U>& u0,
+                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
+                          std::vector<std::int32_t>& dofs0_map,
+                          std::vector<std::int32_t>& dofs1_map) {
 
   auto V0 = u0.function_space();
   assert(V0);
@@ -34,7 +36,7 @@ void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
   const int tdim = mesh0->topology()->dim();
   auto map = mesh0->topology()->index_map(tdim);
   assert(map);
-  std::span<T> u1_array = u1.x()->mutable_array();
+  std::span<const T> u1_array = u1.x()->array();
   std::span<const T> u0_array = u0.x()->array();
 
   // Get all cells
@@ -61,42 +63,53 @@ void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
   // Get block sizes and dof transformation operators
   const int bs1 = dofmap1->bs();
   const int bs0 = dofmap0->bs();
-  auto apply_dof_transformation = element0->template dof_transformation_fn<T>(
+  auto apply_dof_transformation_0 = element0->template dof_transformation_fn<std::int32_t>(
       dolfinx::fem::doftransform::transpose, false);
-  auto apply_inverse_dof_transform
-      = element1->template dof_transformation_fn<T>(
-          dolfinx::fem::doftransform::inverse_transpose, false);
-
-  // Create working array
-  std::vector<T> local0(element0->space_dimension());
-  std::vector<T> local1(element1->space_dimension());
+  auto apply_dof_transformation_1 = element1->template dof_transformation_fn<std::int32_t>(
+      dolfinx::fem::doftransform::transpose, false);
 
 
-  // Iterate over mesh and interpolate on each cell
-  using X = typename dolfinx::scalar_value_type_t<T>;
-  for (std::size_t c = 0; c < cells0.size(); c++)
-  {
+  assert(im_shape[0] == element1->space_dimension());
+  assert(im_shape[1] == element0->space_dimension());
+
+
+  std::vector<std::int32_t> local_dofs0(im_shape[1]);
+  std::vector<std::int32_t> local_dofs1(im_shape[0]);
+  dofs0_map.resize(cells0.size() * im_shape[1]);
+  dofs1_map.resize(cells0.size() * im_shape[0]);
+
+  for (std::size_t c = 0; c < cells0.size(); c++) {
     // Pack and transform cell dofs to reference ordering
-    std::span<const std::int32_t> dofs0 = dofmap0->cell_dofs(cells0[c]);
-    for (std::size_t i = 0; i < dofs0.size(); ++i)
-      for (int k = 0; k < bs0; ++k)
-        local0[bs0 * i + k] = u0_array[bs0 * dofs0[i] + k];
+    std::span<const std::int32_t> D_c = dofmap0->cell_dofs(cells0[c]);
+    // local_dofs0 = [ 0, ..., k-1 ]
+    std::iota(local_dofs0.begin(), local_dofs0.end(), 0);
 
-    apply_dof_transformation(local0, cell_info0, cells0[c], 1);
+    // Permute the vector [0, ..., k-1]
+    apply_dof_transformation_0(local_dofs0, cell_info0, cells0[c], 1);
 
-    // FIXME: Get compile-time ranges from Basix
-    // Apply interpolation operator
-    std::ranges::fill(local1, 0);
-    for (std::size_t i = 0; i < im_shape[0]; ++i)
-      for (std::size_t j = 0; j < im_shape[1]; ++j)
-        local1[i] += static_cast<X>(i_m[im_shape[1] * i + j]) * local0[j];
+    for (std::size_t i = 0; i < im_shape[1]; i++) {
+      dofs0_map[i * cells0.size() + c] = D_c[local_dofs0[i]];
+    }
 
-    apply_inverse_dof_transform(local1, cell_info1, cells1[c], 1);
-    std::span<const std::int32_t> dofs1 = dofmap1->cell_dofs(cells1[c]);
-    for (std::size_t i = 0; i < dofs1.size(); ++i)
-      for (int k = 0; k < bs1; ++k)
-        u1_array[bs1 * dofs1[i] + k] = local1[bs1 * i + k];
+    // local_dofs1 = [ 0, ..., p-1 ]
+    std::iota(local_dofs1.begin(), local_dofs1.end(), 0);
+    apply_dof_transformation_1(local_dofs1, cell_info1, cells0[c], 1);
+
+    std::span<const std::int32_t> E_c = dofmap1->cell_dofs(cells1[c]);
+
+    for (std::size_t i = 0; i < im_shape[0]; ++i) {
+      dofs1_map[i * cells1.size() + c] = E_c[local_dofs1[i]];
+    }
   }
+}
+
+template <dolfinx::scalar T, std::floating_point U>
+void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
+                          dolfinx::fem::Function<T, U>& u0,
+                          std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
+                          const std::vector<std::int32_t>& dofs0_map,
+                          const std::vector<std::int32_t>& dofs1_map) {
+  
 }
 
 namespace impl
@@ -516,6 +529,17 @@ template std::vector<double> eval_reference_basis(
 template void
 interpolate_same_map<double,double>(dolfinx::fem::Function<double,double>& u1,
                           dolfinx::fem::Function<double,double>& u0,
-                          std::vector<double>& i_m, std::array<std::size_t, 2> im_shape); 
-} // namespace dolfinx::CUDA
+                          std::vector<double>& i_m, std::array<std::size_t, 2> im_shape,
+                          const std::vector<std::int32_t>& dofs0_map,
+                          const std::vector<std::int32_t>& dofs1_map);
+
+template void
+create_interpolation_maps(const dolfinx::fem::Function<double, double>& u1,
+                          const dolfinx::fem::Function<double, double>& u0,
+                          std::vector<double>& i_m, std::array<std::size_t, 2> im_shape,
+                          std::vector<std::int32_t>& dofs0_map,
+                          std::vector<std::int32_t>& dofs1_map);
+}
+
+  // // namespace dolfinx::CUDA
 // // namespace dolfinx::CUDA
