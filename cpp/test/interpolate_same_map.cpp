@@ -105,19 +105,19 @@ int main(int argc, char* argv[]) {
   auto coeffs = dolfinx::fem::CUDACoefficient<double>(f) ;
   t2 = high_resolution_clock::now();
   ms = t2 - t1;
-  std::cout << "CUDA initialization: " << ms.count() << " ms" << std::endl;
+  //std::cout << "CUDA initialization: " << ms.count() << " ms" << std::endl;
 
 
-  /* Serial version */
-  coeffs.interpolate(f_from);
+  /* GPU version */
+  auto output = coeffs.interpolate(f_from);
   t1 = high_resolution_clock::now();
   for (std::size_t i = 0; i < ITER; i++) {
-    coeffs.interpolate(f_from);
+    output = coeffs.interpolate(f_from);
   }
   t2 = high_resolution_clock::now();
   ms = t2 - t1;
   std::cout << "Serial implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
-  allClose(f_true->x()->array(), f->x()->array());
+  allClose(f_true->x()->array(), output);
 
 
 

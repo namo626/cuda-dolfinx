@@ -120,7 +120,7 @@ public:
   }
 
   /// Interpolate a Function associated with the same mesh over all cells
-  void interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
+  std::vector<T> interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
     // If we haven't used this function before, need to initialize the necessary operators
     if (_g != g) {
       _g = g;
@@ -155,8 +155,10 @@ public:
     }
 
     //CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
-    CUDA::cuda_interpolate_same_map(*_f, *_g, _dvalues, _dvalues_g, _d_i_m, _im_shape, _dof0_mask,
-                                    _dof1_mask);
+    std::vector<T> output;
+    CUDA::cuda_interpolate_same_map(*_f, *_g, _dvalues, _dvalues_size, _dvalues_g, _d_i_m, _im_shape, _dof0_mask,
+                                    _dof1_mask, output);
+    return output;
   }
 
 
