@@ -42,6 +42,30 @@ __global__ void _basis_expand(int num_cells, const int* cells, int bs_element, i
   }
 }
 
+__global__ void _gather_dofs(double* A, const double* _y, const int* mask, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        A[i] = _y[mask[i]];
+    }
+}
+
+__global__ void _scatter_dofs(const double* B, double* _x, const int* mask, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        _x[mask[i]] = B[i];
+    }
+}
+
+__global__ void _matmul(double* B, double* i_m, double* A, int P, int K, int C) {
+
+  for (std::size_t p = 0; p < P; p++) {
+    for (std::size_t c = 0; c < C; c++) {
+      for (std::size_t k = 0; k < K; k++) {
+        B[p * C + c] += i_m[p * K + k] * A[k * C + c];
+      }
+    }
+  }
+}
 namespace dolfinx::CUDA {
     
 void cuda_wrapper_interpolate(int dof_count, int num_points, const double *xs,
@@ -89,5 +113,41 @@ std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, doubl
   cudaFree(d_cells);
 
   return u;
+}
+
+void cuda_interpolate_same_map(dolfinx::fem::Function<double, double> &u1,
+                               dolfinx::fem::Function<double, double> &u0,
+                               CUdeviceptr _x,
+                               CUdeviceptr _y,
+                               CUdeviceptr i_m,
+                               std::array<std::size_t, 2> im_shape,
+                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map) {
+
+  auto V0 = u0.function_space();
+  auto V1 = u1.function_space();
+  auto mesh0 = V0->mesh();
+  const int tdim = mesh0->topology()->dim();
+  auto map = mesh0->topology()->index_map(tdim);
+
+  // Get all cells
+  std::vector<std::int32_t> cells(map->size_local() + map->num_ghosts(), 0);
+  const std::size_t P = im_shape[0];
+  const std::size_t K = im_shape[1];
+  const std::size_t C = cells.size();
+
+
+  double *A, *B;
+  cudaMalloc((void**)&A, C*K*sizeof(double));
+  cudaMalloc((void**)&B, C*P*sizeof(double));
+
+  _gather_dofs<<<1,1>>>(A, (double*)_y, (int*)dofs0_map, C*K);
+
+  _matmul<<<1,1>>>(B, (double*)i_m, A, P, K, C);
+
+  _scatter_dofs<<<1,1>>>(B, (double*)_x, (int*)dofs1_map, C*P);
+
+  cudaFree(A);
+  cudaFree(B);
+
 }
 }
