@@ -106,7 +106,7 @@ void create_interpolation_maps(const dolfinx::fem::Function<T, U>& u1,
 
 template <dolfinx::scalar T, std::floating_point U>
 void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
-                          dolfinx::fem::Function<T, U>& u0,
+                          const dolfinx::fem::Function<T, U>& u0,
                           std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
                           const std::vector<std::int32_t>& dofs0_map,
                           const std::vector<std::int32_t>& dofs1_map) {
@@ -562,7 +562,7 @@ template std::vector<double> eval_reference_basis(
 
 template void
 interpolate_same_map<double,double>(dolfinx::fem::Function<double,double>& u1,
-                          dolfinx::fem::Function<double,double>& u0,
+                          const dolfinx::fem::Function<double,double>& u0,
                           std::vector<double>& i_m, std::array<std::size_t, 2> im_shape,
                           const std::vector<std::int32_t>& dofs0_map,
                           const std::vector<std::int32_t>& dofs1_map);

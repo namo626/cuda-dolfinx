@@ -149,6 +149,7 @@ def test_cuda_assembly():
     # now we need to compare the two
     compare_mats(Mat1, Mat2.mat)
 
+  print("PASSED")
 def test_reassembly():
   """Ensure correct assembly when coefficients are updated
   """
@@ -217,3 +218,6 @@ def test_block_assembly():
     fe.petsc.assemble_vector_block(vec_fe, cuda_L.dolfinx_forms, [[None], [None]])
     compare_vecs(vec_fe, vec_cuda.vector)
 
+
+if __name__ == "__main__":
+  test_cuda_assembly()

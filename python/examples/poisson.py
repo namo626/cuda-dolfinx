@@ -84,8 +84,8 @@ def main(res, cuda=True, degree=1, dim=3, repeats=1):
         b = cuda_b.vector
         device_bcs = asm.pack_bcs([bc])
     else:
-        a = fe.form(a, jit_options = {"cffi_extra_compile_args":["-O3", "-mcpu=neoverse-v2"]})
-        L = fe.form(L, jit_options = {"cffi_extra_compile_args":["-O3", "-mcpu=neoverse-v2"]})
+        a = fe.form(a, jit_options = {"cffi_extra_compile_args":["-O3"]})
+        L = fe.form(L, jit_options = {"cffi_extra_compile_args":["-O3"]})
         A = fe_petsc.create_matrix(a)
         b = fe_petsc.create_vector(L)
     for i in range(repeats):

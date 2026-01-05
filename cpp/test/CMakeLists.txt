@@ -30,9 +30,9 @@ endif()
 find_package(CUDAToolkit REQUIRED)
 
 
-add_executable(interpolate_1d interpolate.cpp)
-add_executable(interpolate_3d interpolate_3d.cpp)
-add_executable(eval eval.cpp)
+#add_executable(interpolate_1d interpolate.cpp)
+#add_executable(interpolate_3d interpolate_3d.cpp)
+#add_executable(eval eval.cpp)
 add_executable(interpolate_same_map interpolate_same_map.cpp)
 
 function(link_interpolate name)
@@ -42,9 +42,9 @@ function(link_interpolate name)
   target_link_libraries(${name} PRIVATE CUDA::cuda_driver CUDA::nvrtc CUDA::cupti)
 endfunction()
 
-link_interpolate(interpolate_1d)
-link_interpolate(interpolate_3d)
-link_interpolate(eval)
+#link_interpolate(interpolate_1d)
+#link_interpolate(interpolate_3d)
+#link_interpolate(eval)
 link_interpolate(interpolate_same_map)
 
 

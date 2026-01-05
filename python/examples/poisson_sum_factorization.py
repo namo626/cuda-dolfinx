@@ -84,7 +84,7 @@ def main(res, cuda=True, sum_factorization=True, degree=1):
         a = fe.form(
                 a,
                 form_compiler_options=form_compiler_options,
-                jit_options = {"cffi_extra_compile_args":["-O3", "-mcpu=neoverse-v2"]}
+                jit_options = {"cffi_extra_compile_args":["-O3"]}
         )
         A = fe_petsc.create_matrix(a)
 

@@ -56,5 +56,5 @@ ENV PETSC_OPTIONS="-use_gpu_aware_mpi 0" \
     PATH=/usr/local/bin:$PATH
 
 # Remove the preinstalled dolfinx
-WORKDIR /
-RUN rm -rf /usr/local/dolfinx-real
+# WORKDIR /
+# RUN rm -rf /usr/local/dolfinx-real

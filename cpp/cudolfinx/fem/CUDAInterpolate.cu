@@ -119,8 +119,8 @@ std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, doubl
   return u;
 }
 
-void cuda_interpolate_same_map(dolfinx::fem::Function<double, double> &u1,
-                               dolfinx::fem::Function<double, double> &u0,
+void cuda_interpolate_same_map(const dolfinx::fem::Function<double, double> &u1,
+                               const dolfinx::fem::Function<double, double> &u0,
                                CUdeviceptr _x,
                                int dvalues_size,
                                CUdeviceptr _y,

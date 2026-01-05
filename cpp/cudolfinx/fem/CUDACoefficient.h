@@ -26,14 +26,14 @@ class CUDACoefficient
 public:
   
   /// @brief Construct a new CUDACoefficient
-  CUDACoefficient(std::shared_ptr<Function<T, U>> f) {
+  CUDACoefficient(std::shared_ptr<const Function<T, U>> f) {
     _f = f;
     _x = f->x();
     _g = nullptr;
     _dvalues_size = _x->bs() * (_x->index_map()->size_local()+_x->index_map()->num_ghosts()) * sizeof(T);
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
     copy_host_values_to_device();
-    init_interpolation();
+    //init_interpolation();
 
     _basis_values = {};
 
@@ -47,6 +47,7 @@ public:
     CUDA::safeMemcpyHtoD(_dvalues, (void*)(_x->array().data()), _dvalues_size);
   }
 
+  /*
   /// Compute physical interpolation points on host and copy to device
   void init_interpolation()
   {
@@ -118,6 +119,7 @@ public:
     //assert(_ddofmap.num_dofs() == space_dimension*cells.size());
     return CUDA::cuda_basis_expand(*_f, _ddofmap.dofs_per_cell(), _dvalues, _dbasis_values, cells);
   }
+  */
 
   /// Interpolate a Function associated with the same mesh over all cells
   std::vector<T> interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
@@ -192,9 +194,9 @@ private:
   // Size of coefficient array
   size_t _dvalues_size;
   // Pointer to host-side Function
-  std::shared_ptr<dolfinx::fem::Function<T, U>> _f;
+  std::shared_ptr<const dolfinx::fem::Function<T, U>> _f;
   // Pointer to host-side coefficient vector
-  std::shared_ptr<dolfinx::la::Vector<T>> _x;
+  std::shared_ptr<const dolfinx::la::Vector<T>> _x;
 
   // Number of interpolation points
   size_t _num_interp_pts;

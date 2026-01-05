@@ -25,7 +25,7 @@ RUN git clone --depth 1 --branch v0.9.0 https://github.com/FEniCS/dolfinx.git
 RUN git clone --depth 1 --branch v0.9.0 https://github.com/FEniCS/ffcx.git 
 RUN git clone --depth 1 --branch v0.9.0 https://github.com/FEniCS/basix.git
 RUN git clone --depth 1 --branch 2024.2.0 https://github.com/FEniCS/ufl.git
-RUN git clone --depth 1 --branch v0.9.0 https://github.com/bpachev/cuda-dolfinx.git
+RUN git clone --depth 1 --branch version-0.9.0 https://github.com/bpachev/cuda-dolfinx.git
 
 RUN cp dolfinx/docker/dolfinx-real-mode /usr/local/bin/dolfinx-real-mode
 RUN chmod +x /usr/local/bin/dolfinx-*-mode
