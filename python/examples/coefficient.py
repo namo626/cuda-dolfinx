@@ -21,26 +21,26 @@ u2 = fem.Function(V2)
 u2.interpolate(lambda x: 1 + 0.1*x[0]**2 + 0.2*x[1]**2 + 0.3*x[2]**2)
 
 if __name__ == "__main__":
-    niter = 5
+    niter = 10
 
     u_true.interpolate(u2)
     start = time.perf_counter()
     for _ in range(niter):
-        interp = u_true.interpolate(u2)
+        u_true.interpolate(u2)
     
     end = time.perf_counter()
     print(f"CPU Time: {1e3*(end-start)/niter:.2f} ms")
 
     coeff = cufem.Coefficient(u)
-    interp = coeff.interpolate(u2) # initialize
+    coeff.interpolate(u2) # initialize
 
     start = time.perf_counter()
     for _ in range(niter):
-        interp = coeff.interpolate_fast(u2)
+        coeff.interpolate(u2)
 
     end = time.perf_counter()
 
     print(f"GPU Time: {1e3*(end-start)/niter:.2f} ms")
 
-    assert np.allclose(u_true.x.array, interp, rtol=1e-12)
+    assert np.allclose(u_true.x.array, coeff.values(), rtol=1e-12)
     print("PASSED")

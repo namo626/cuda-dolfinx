@@ -16,16 +16,16 @@ void declare_cuda_coefficient(nb::module_& m)
   .def(nb::init<std::shared_ptr<const dolfinx::fem::Function<T,U>>>(),
   "Create device side function from a given Function")
   .def("interpolate",
-       &dolfinx::fem::CUDACoefficient<T,U>::interpolate,
-       "Interpolate from another Function defined on the same mesh")
-  .def("interpolate_fast",
        [](dolfinx::fem::CUDACoefficient<T,U>& self,
           std::shared_ptr<dolfinx::fem::Function<T,U>> g) {
-
-         auto output = self.interpolate(g);
-         return nb::ndarray<T, nb::numpy, nb::c_contig>(output.data(), {output.size()}).cast();
+         self.interpolate(g);
        },
-       "Interpolate from another Function defined on the same mesh");
+       "Interpolate from another Function defined on the same mesh")
+  .def("values",
+       [](dolfinx::fem::CUDACoefficient<T,U>& self) {
+         auto v = self.values();
+         return nb::ndarray<T, nb::numpy, nb::c_contig>(v.data(), {v.size()}).cast();
+       });
 }
 
 namespace cudolfinx_wrappers

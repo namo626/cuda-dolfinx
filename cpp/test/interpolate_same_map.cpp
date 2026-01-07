@@ -25,7 +25,7 @@ template<typename T, typename U>
 void allClose(const T& v1, const U& v2) {
   assert(v1.size() == v2.size());
   for (std::size_t i = 0; i < v1.size(); i++) {
-    assert(std::abs((v1[i] - v2[i])/(v1[i])) < 1e-8);
+    assert(std::abs((v1[i] - v2[i])/(v1[i])) < 1e-13);
   }
 }
 
@@ -109,18 +109,16 @@ int main(int argc, char* argv[]) {
 
 
   /* GPU version */
-  auto output = coeffs.interpolate(f_from);
+  coeffs.interpolate(f_from);
   t1 = high_resolution_clock::now();
   for (std::size_t i = 0; i < ITER; i++) {
-    output = coeffs.interpolate(f_from);
+    coeffs.interpolate(f_from);
   }
   t2 = high_resolution_clock::now();
   ms = t2 - t1;
   std::cout << "Serial implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
-  allClose(f_true->x()->array(), output);
+  allClose(f_true->x()->array(), coeffs.values());
 
-  std::cout << output[output.size()-1] << std::endl;
-  std::cout << f_true->x()->array()[output.size()-1] << std::endl;
 
 
   return 0;
