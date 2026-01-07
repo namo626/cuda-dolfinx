@@ -1,6 +1,8 @@
 #include <memory>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/vector.h>
+#include <nanobind/ndarray.h>
 #include <cudolfinx/fem/CUDACoefficient.h>
 
 
@@ -12,7 +14,18 @@ void declare_cuda_coefficient(nb::module_& m)
 {
   nb::class_<dolfinx::fem::CUDACoefficient<T,U>>(m, "CUDACoefficient", "Device side function")
   .def(nb::init<std::shared_ptr<const dolfinx::fem::Function<T,U>>>(),
-  "Create device side function from a given Function");
+  "Create device side function from a given Function")
+  .def("interpolate",
+       &dolfinx::fem::CUDACoefficient<T,U>::interpolate,
+       "Interpolate from another Function defined on the same mesh")
+  .def("interpolate_fast",
+       [](dolfinx::fem::CUDACoefficient<T,U>& self,
+          std::shared_ptr<dolfinx::fem::Function<T,U>> g) {
+
+         auto output = self.interpolate(g);
+         return nb::ndarray<T, nb::numpy, nb::c_contig>(output.data(), {output.size()}).cast();
+       },
+       "Interpolate from another Function defined on the same mesh");
 }
 
 namespace cudolfinx_wrappers

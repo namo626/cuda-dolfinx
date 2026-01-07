@@ -7,3 +7,11 @@ class Coefficient:
                  f: Function):
         self._ctx = get_cuda_context()
         self._cpp_object = _cucpp.fem.CUDACoefficient(f._cpp_object)
+
+    def interpolate(self,
+                    g: Function):
+        return self._cpp_object.interpolate(g._cpp_object)
+
+    def interpolate_fast(self,
+                    g: Function):
+        return self._cpp_object.interpolate_fast(g._cpp_object)

@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
   cuCtxCreate(&cuContext, 0, cuDevice);
   const int num_cells = 20;
   const T lower = 0.;
-  const T upper = 10.;
+  const T upper = 1.;
   const int p_order = 7;
 
   auto element = basix::create_element<T>(
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
       });
 
   /* Reference version */
-  const std::size_t ITER = 10;
+  const std::size_t ITER = 5;
   auto t1 = high_resolution_clock::now();
   for (std::size_t i = 0; i < ITER; i++)
     f_true->interpolate(*f_from);
@@ -119,6 +119,8 @@ int main(int argc, char* argv[]) {
   std::cout << "Serial implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
   allClose(f_true->x()->array(), output);
 
+  std::cout << output[output.size()-1] << std::endl;
+  std::cout << f_true->x()->array()[output.size()-1] << std::endl;
 
 
   return 0;
