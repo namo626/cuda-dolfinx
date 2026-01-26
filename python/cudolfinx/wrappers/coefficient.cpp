@@ -8,8 +8,7 @@
 
 namespace nb = nanobind;
 
-template <dolfinx::scalar T,
-          std::floating_point U = dolfinx::scalar_value_type_t<T>>
+template <typename T, typename U>
 void declare_cuda_coefficient(nb::module_& m)
 {
   nb::class_<dolfinx::fem::CUDACoefficient<T,U>>(m, "CUDACoefficient", "Device side function")

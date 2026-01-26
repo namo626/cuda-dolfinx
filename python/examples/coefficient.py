@@ -12,8 +12,8 @@ import time
 
 #domain = mesh.create_unit_square(MPI.COMM_WORLD, 8, 8, mesh.CellType.quadrilateral)
 domain = mesh.create_unit_cube(MPI.COMM_WORLD, 20, 20, 20, mesh.CellType.tetrahedron)
-V = fem.functionspace(domain, ("Lagrange", 7))
-V2 = fem.functionspace(domain, ("Lagrange", 6))
+V = fem.functionspace(domain, ("Lagrange", 4))
+V2 = fem.functionspace(domain, ("Lagrange", 3))
 u = fem.Function(V)
 u_true = fem.Function(V)
 u2 = fem.Function(V2)
@@ -21,7 +21,7 @@ u2 = fem.Function(V2)
 u2.interpolate(lambda x: 1 + 0.1*x[0]**2 + 0.2*x[1]**2 + 0.3*x[2]**2)
 
 if __name__ == "__main__":
-    niter = 10
+    niter = 5
 
     u_true.interpolate(u2)
     start = time.perf_counter()
