@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cudolfinx/fem/CUDACoefficient.h>
 #include <dolfinx.h>
+#include <dolfinx/fem/FiniteElement.h>
 #include <dolfinx/fem/FunctionSpace.h>
 #include <dolfinx/fem/utils.h>
 #include <dolfinx/mesh/generation.h>
@@ -53,10 +54,10 @@ int main(int argc, char* argv[]) {
   std::cout << "No. of devices: " << device_count << std::endl;
 
   cuCtxCreate(&cuContext, 0, cuDevice);
-  const int num_cells = 20;
+  const int num_cells = 30;
   const T lower = 0.;
   const T upper = 1.;
-  const int p_order = 7;
+  const int p_order = 3;
 
   auto element = basix::create_element<T>(
       basix::element::family::P, basix::cell::type::tetrahedron, p_order,
@@ -64,16 +65,19 @@ int main(int argc, char* argv[]) {
       basix::element::dpc_variant::unset, false);
 
   auto element_from = basix::create_element<T>(
-      basix::element::family::P, basix::cell::type::tetrahedron, 6,
+      basix::element::family::P, basix::cell::type::tetrahedron, 4,
       basix::element::lagrange_variant::equispaced,
       basix::element::dpc_variant::unset, false);
+
+  auto e0 = std::make_shared<fem::FiniteElement<T>>(element);
+  auto e1 = std::make_shared<fem::FiniteElement<T>>(element_from);
 
   const auto mesh = std::make_shared<mesh::Mesh<T>>(mesh::create_box(
       MPI_COMM_WORLD, {{{lower, lower, lower}, {upper, upper, upper}}},
       {num_cells, num_cells, num_cells}, mesh::CellType::tetrahedron));
 
-  auto V = std::make_shared<fem::FunctionSpace<T>>(fem::create_functionspace(mesh, element, {}));
-  auto V_from = std::make_shared<fem::FunctionSpace<T>>(fem::create_functionspace(mesh, element_from, {}));
+  auto V = std::make_shared<fem::FunctionSpace<T>>(fem::create_functionspace<T>(mesh, e0));
+  auto V_from = std::make_shared<fem::FunctionSpace<T>>(fem::create_functionspace<T>(mesh, e1));
   auto f = std::make_shared<fem::Function<T>>(V);
   auto f_true = std::make_shared<fem::Function<T>>(V);
   auto f_from = std::make_shared<fem::Function<T>>(V_from);
