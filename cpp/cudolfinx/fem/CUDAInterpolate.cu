@@ -119,15 +119,13 @@ std::vector<double> cuda_basis_expand(const dolfinx::fem::Function<double, doubl
   return u;
 }
 
-void cuda_interpolate_same_map(dolfinx::fem::Function<double, double> &u1,
-                               dolfinx::fem::Function<double, double> &u0,
+void cuda_interpolate_same_map(const dolfinx::fem::Function<double, double> &u1,
+                               const dolfinx::fem::Function<double, double> &u0,
                                CUdeviceptr _x,
-                               int dvalues_size,
                                CUdeviceptr _y,
                                CUdeviceptr i_m,
                                std::array<std::size_t, 2> im_shape,
-                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map,
-                               std::vector<double>& output) {
+                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map) {
 
   auto V0 = u0.function_space();
   auto V1 = u1.function_space();
@@ -152,16 +150,10 @@ void cuda_interpolate_same_map(dolfinx::fem::Function<double, double> &u1,
   dim3 dimBlock(16,16, 1);
   _matmul<<<dimGrid,dimBlock>>>(B, (double*)i_m, A, P, K, C);
 
-  double* tmp;
-  cudaMalloc((void**)&tmp, dvalues_size);
-  output.resize(dvalues_size/sizeof(double));
-
-  _scatter_dofs<<<C*P/128+1, 128>>>(B, tmp, (int*)dofs1_map, C*P);
-
-  cudaMemcpy(output.data(), tmp, output.size()*sizeof(double), cudaMemcpyDeviceToHost);
+  _scatter_dofs<<<C*P/128+1, 128>>>(B, (double*)_x, (int*)dofs1_map, C*P);
 
 
-  cudaFree(tmp);
+
   cudaFree(A);
   cudaFree(B);
 

@@ -47,6 +47,11 @@ public:
     CUDA::safeMemcpyHtoD(_dvalues, (void*)(_x->array().data()), _dvalues_size);
   }
 
+  void copy_device_values_to_host()
+  {
+    CUDA::safeMemcpyDtoH(_x->mutable_array().data(), _dvalues, _dvalues_size);
+  }
+
   /// Compute physical interpolation points on host and copy to device
   void init_interpolation()
   {
@@ -120,7 +125,7 @@ public:
   }
 
   /// Interpolate a Function associated with the same mesh over all cells
-  std::vector<T> interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
+  void interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
     // If we haven't used this function before, need to initialize the necessary operators
     if (_g != g) {
       _g = g;
@@ -155,10 +160,9 @@ public:
     }
 
     //CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
-    std::vector<T> output;
-    CUDA::cuda_interpolate_same_map(*_f, *_g, _dvalues, _dvalues_size, _dvalues_g, _d_i_m, _im_shape, _dof0_mask,
-                                    _dof1_mask, output);
-    return output;
+    CUDA::cuda_interpolate_same_map(*_f, *_g, _dvalues, _dvalues_g, _d_i_m, _im_shape, _dof0_mask,
+                                    _dof1_mask);
+    copy_device_values_to_host();
   }
 
 
@@ -167,9 +171,6 @@ public:
 
   /// Copy device coefficient array to host, then return.
   std::shared_ptr<const dolfinx::la::Vector<T>> x() const {
-    std::vector<T> coeffs(_dvalues_size / sizeof(T));
-    CUDA::safeMemcpyDtoH(coeffs.data(), _dvalues, _dvalues_size);
-    _x->array() = coeffs;
     return _x;
   }
 

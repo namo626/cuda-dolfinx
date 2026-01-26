@@ -53,10 +53,10 @@ int main(int argc, char* argv[]) {
   std::cout << "No. of devices: " << device_count << std::endl;
 
   cuCtxCreate(&cuContext, 0, cuDevice);
-  const int num_cells = 20;
+  const int num_cells = 40;
   const T lower = 0.;
   const T upper = 10.;
-  const int p_order = 7;
+  const int p_order = 4;
 
   auto element = basix::create_element<T>(
       basix::element::family::P, basix::cell::type::tetrahedron, p_order,
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
       basix::element::dpc_variant::unset, false);
 
   auto element_from = basix::create_element<T>(
-      basix::element::family::P, basix::cell::type::tetrahedron, 6,
+      basix::element::family::P, basix::cell::type::tetrahedron, 5,
       basix::element::lagrange_variant::equispaced,
       basix::element::dpc_variant::unset, false);
 
@@ -109,15 +109,15 @@ int main(int argc, char* argv[]) {
 
 
   /* GPU version */
-  auto output = coeffs.interpolate(f_from);
+  coeffs.interpolate(f_from);
   t1 = high_resolution_clock::now();
   for (std::size_t i = 0; i < ITER; i++) {
-    output = coeffs.interpolate(f_from);
+    coeffs.interpolate(f_from);
   }
   t2 = high_resolution_clock::now();
   ms = t2 - t1;
-  std::cout << "Serial implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
-  allClose(f_true->x()->array(), output);
+  std::cout << "GPU implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
+  allClose(f_true->x()->array(), coeffs.x()->array());
 
 
 

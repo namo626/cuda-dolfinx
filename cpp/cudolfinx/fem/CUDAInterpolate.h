@@ -42,15 +42,13 @@ void create_interpolation_maps(const dolfinx::fem::Function<T, U>& u1,
                           std::vector<T>& i_m, std::array<std::size_t, 2> im_shape,
                           std::vector<std::int32_t>& dofs0_map,
                           std::vector<std::int32_t>& dofs1_map);
-void cuda_interpolate_same_map(dolfinx::fem::Function<double, double> &u1,
-                               dolfinx::fem::Function<double, double> &u0,
+void cuda_interpolate_same_map(const dolfinx::fem::Function<double, double> &u1,
+                               const dolfinx::fem::Function<double, double> &u0,
                                CUdeviceptr _x,
-                               int _x_size,
                                CUdeviceptr _y,
                                CUdeviceptr i_m,
                                std::array<std::size_t, 2> im_shape,
-                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map,
-                               std::vector<double>& output);
+                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map);
 
 template <dolfinx::scalar T, std::floating_point U>
 void interpolate_same_map(dolfinx::fem::Function<T, U>& u1,
