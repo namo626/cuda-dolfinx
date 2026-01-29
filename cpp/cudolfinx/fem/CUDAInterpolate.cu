@@ -1,38 +1,46 @@
 #include <cuda.h>
 #include <vector>
 #include <array>
+#include <concepts>
 
 __device__ double func(double x, double y, double z) {
     return 1. + 0.1*x*x + 0.2*y*y + 0.3*z*z;
 }
 
-
-__global__ void _gather_dofs(double* A, const double* _y, const int* mask, int n) {
+// Assign A with entries of B as specified in M.
+// A and M are of size n.
+template<std::floating_point T>
+__global__ void _mask_right(T* A, const T* B, const int* M, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
-        A[i] = _y[mask[i]];
+        A[i] = B[M[i]];
     }
 }
 
-__global__ void _scatter_dofs(const double* B, double* _x, const int* mask, int n) {
+// Write each entry B[i] to the location M[i] in A.
+// B and M are of size n.
+template<std::floating_point T>
+__global__ void _mask_left(T* A, const T* B, const int* M, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
-        _x[mask[i]] = B[i];
-        //_x[i] = 1.0;
+        A[M[i]] = B[i];
     }
 }
 
-__global__ void _matmul(double* B, double* i_m, double* A, int P, int K, int C) {
+// Compute C = AB
+// A is m x k, B is k x n, C is m x n
+template<std::floating_point T>
+__global__ void _matmul(T* C, const T* A, const T* B, int m, int k, int n) {
 
     int row = blockIdx.y*blockDim.y + threadIdx.y;
     int col = blockIdx.x*blockDim.x + threadIdx.x;
 
-    if ((row < P) && (col < C)) {
-        double s = 0;
-        for (int k = 0; k < K; k++) {
-            s += i_m[row*K + k] * A[k*C + col];
+    if ((row < m) && (col < n)) {
+        T s = 0;
+        for (int kk = 0; kk < k; kk++) {
+            s += A[row*k + kk] * B[kk*n + col];
         }
-        B[row*C + col] = s;
+        C[row*n + col] = s;
     }
 }
 namespace dolfinx::CUDA {
@@ -50,12 +58,14 @@ void wrapper_cuda_interpolate_same_map(int P, int K, int C,
   cudaMalloc((void **)&A, C * K * sizeof(double));
   cudaMalloc((void **)&B, C * P * sizeof(double));
 
-  _gather_dofs<<<C * K / 128 + 1, 128>>>(A, (double *)_y, (int *)dofs0_map,
-                                         C * K);
+  const int numThreads = 128;
+  _mask_right<<<n*k/numThreads+1, numThreads>>>(X0, (double *)x0, (int *)M0,
+                                         n*k);
 
-  dim3 dimGrid(C / 16 + 1, P / 16 + 1, 1);
-  dim3 dimBlock(16, 16, 1);
-  _matmul<<<dimGrid, dimBlock>>>(B, (double *)i_m, A, P, K, C);
+  const int matSize = 16;
+  dim3 dimGrid(n / matSize + 1, m / matSize + 1, 1);
+  dim3 dimBlock(matSize, matSize, 1);
+  _matmul<<<dimGrid, dimBlock>>>(X1, (double *)i_m, X0, m, k, n);
 
   double *tmp;
   cudaMalloc((void **)&tmp, dvalues_size);
