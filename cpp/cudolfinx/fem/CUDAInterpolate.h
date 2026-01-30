@@ -20,6 +20,16 @@ void d_interpolate_same_map(T* u1,
                             int n1, int C,
                             T* i_m, int* M0, int* M1);
 
+/// Same-map interpolation on device.
+///
+/// @param[out] u1 Pointer to device-side coefficient array that will be updated
+/// by the interpolation.
+/// @param[in] u0 Pointer to device-side coefficient array to be interpolated FROM
+/// @param[in] im_shape Shape of interpolation array
+/// @param[in] num_cells No. of cells in the mesh
+/// @param[in] i_m Pointer to device-side interpolation matrix with dim n1 x n0
+/// @param[in] M1 Pointer to device-side DOF map for u1
+/// @param[in] M0 Pointer to device-side DOF map for u0
 template<std::floating_point T>
 void interpolate_same_map(
                           CUdeviceptr ux1,
@@ -27,17 +37,17 @@ void interpolate_same_map(
                           std::array<std::size_t, 2> im_shape,
                           std::size_t num_cells,
                           CUdeviceptr i_m,
-                          CUdeviceptr M0,
-                          CUdeviceptr M1) {
+                          CUdeviceptr M1,
+                          CUdeviceptr M0) {
 
 
   const std::size_t n1 = im_shape[0];
   const std::size_t n0 = im_shape[1];
 
-  d_interpolate_same_map<T>((T*)ux1, (T*)ux0, n0, n1, num_cells, (T*)i_m, (int*)M0, (int*)M1);
+  d_interpolate_same_map<T>((T*)ux1, (T*)ux0, n1, n0, num_cells, (T*)i_m, (int*)M1, (int*)M0);
 }
 
-/// Create a global-to-cells DOF map for a given Function object.
+/// @brief Create a global-to-cells DOF map for a given Function object.
 /// 
 /// @returns Map for Function u, of size dof_per_elem x num_cells. M[i,c] contains the index of the
 /// global DOF that is mapped to the ith local DOF in cell `c`, in the reference ordering. 

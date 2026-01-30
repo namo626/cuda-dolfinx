@@ -26,10 +26,10 @@ class CUDACoefficient
 public:
   
   /// @brief Construct a new CUDACoefficient
-  CUDACoefficient(std::shared_ptr<const Function<T, U>> f) {
+  CUDACoefficient(std::shared_ptr<const Function<T, U>> f)
+  {
     _f = f;
     _x = f->x();
-    _g = nullptr;
     _values.assign(_x->array().begin(), _x->array().end());
     _dvalues_size = _x->bs() * (_x->index_map()->size_local()+_x->index_map()->num_ghosts()) * sizeof(T);
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
@@ -40,6 +40,10 @@ public:
     auto map = mesh->topology()->index_map(mesh->topology()->dim());
     _num_cells = map->size_local() + map->num_ghosts();
 
+    // Create global-to-cell DOF map used for interpolation
+    _M = CUDA::create_interpolation_map(*_f);
+    CUDA::safeMemAlloc(&_dM, _M.size()*sizeof(int));
+    CUDA::safeMemcpyHtoD(_dM, (void*)(_M.data()), _M.size()*sizeof(int));
   }
 
   /// Copy to device, allocating GPU memory if required
@@ -53,61 +57,60 @@ public:
     CUDA::safeMemcpyDtoH((void*)_values.data(), _dvalues, _dvalues_size);
   }
 
-  /// Interpolate a Function associated with the same mesh over all cells.
-  /// Update host-side coefficient vector.
-  void interpolate(std::shared_ptr<dolfinx::fem::Function<T, U>> g) {
-    // If we haven't used this function before, need to initialize the necessary operators
-    if (_g != g) {
-      _g = g;
-      auto element0 = _g->function_space()->element();
-      assert(element0);
-      auto element1 = _f->function_space()->element();
+  /// @brief Interpolate from CUDACoefficient `d_g` associated with the same mesh over all cells.
+  /// This updates both host and device coefficient vectors of this object (not the host-side Function).
+  ///
+  /// @pre Both functions must share the same reference map.
+  void interpolate(const CUDACoefficient<T, U>& d_g)
+  {
+    auto element0 = d_g.host_function()->function_space()->element();
+    assert(element0);
+    auto element1 = _f->function_space()->element();
 
-      // Copy DOF vector of g to device
-      auto _y = _g->x();
-      int _dvalues_g_size = _y->bs() * (_y->index_map()->size_local()+_y->index_map()->num_ghosts()) * sizeof(T);
-      CUDA::safeMemAlloc(&_dvalues_g, _dvalues_g_size);
-      CUDA::safeMemcpyHtoD(_dvalues_g, (void*)(_y->array().data()), _dvalues_g_size);
+    // Device-side cofficient vector of g
+    CUdeviceptr _dvalues_g = d_g.device_values();
 
-      // Create interpolation operator
-      auto [x, y] = element1->create_interpolation_operator(*element0);
-      _i_m = x;
-      _im_shape = y;
-      //std::cout << "im_shape[0] = " << _im_shape[0] << std::endl;
-      //std::cout << "im_shape[1] = " << _im_shape[1] << std::endl;
-      CUDA::safeMemAlloc(&_d_i_m, _i_m.size()*sizeof(T));
-      CUDA::safeMemcpyHtoD(_d_i_m, (void*)(_i_m.data()), _i_m.size()*sizeof(T));
+    // Create interpolation operator IM, mapping g to f
+    auto [IM, _im_shape] = element1->create_interpolation_operator(*element0);
+    CUdeviceptr dIM;
+    CUDA::safeMemAlloc(&dIM, IM.size()*sizeof(T));
+    CUDA::safeMemcpyHtoD(dIM, (void*)(IM.data()), IM.size()*sizeof(T));
 
-      // Create interpolation mappings once
-      _M0 = CUDA::create_interpolation_map(*_g);
-      _M1 = CUDA::create_interpolation_map(*_f);
+    CUDA::interpolate_same_map<T>(_dvalues, _dvalues_g, _im_shape, _num_cells, dIM, _dM, d_g.device_dof_matrix());
 
-      // Copy interpolation maps to device
-      CUDA::safeMemAlloc(&_dM0, _M0.size()*sizeof(int));
-      CUDA::safeMemAlloc(&_dM1, _M1.size()*sizeof(int));
-      CUDA::safeMemcpyHtoD(_dM0, (void*)(_M0.data()), _M0.size()*sizeof(int));
-      CUDA::safeMemcpyHtoD(_dM1, (void*)(_M1.data()), _M1.size()*sizeof(int));
-      
-    }
-
-    CUDA::interpolate_same_map<T>(_dvalues, _dvalues_g, _im_shape, _num_cells, _d_i_m, _dM0, _dM1);
     copy_device_values_to_host();
+    cuMemFree(dIM);
   }
 
 
   /// Return a copy of host-side coefficient vector
-  std::vector<T> values() const {
+  std::vector<T> values() const
+  {
     return _values;
   }
 
   /// Get pointer to vector data on device
-  CUdeviceptr device_values() const { return _dvalues; }
+  CUdeviceptr device_values() const
+  {
+    return _dvalues;
+  }
 
+  /// Get pointer to the underlying Function
+  std::shared_ptr<const dolfinx::fem::Function<T,U>> host_function() const
+  {
+    return _f;
+  }
+
+  CUdeviceptr device_dof_matrix() const
+  {
+    return _dM;
+  }
 
   ~CUDACoefficient() {
     if (_dvalues)
       cuMemFree(_dvalues);
-
+    if (_dM)
+        cuMemFree(_dM);
   }
 
 private:
@@ -125,19 +128,9 @@ private:
   // Total number of cells
   size_t _num_cells;
 
-  std::shared_ptr<dolfinx::fem::Function<T, U>> _g;
-  CUdeviceptr _dvalues_g;
-  // Interpolation operator for _g
-  std::vector<T> _i_m;
-  std::array<std::size_t, 2> _im_shape;
-  // Device-side
-  CUdeviceptr _d_i_m;
-
   // Interpolation maps
-  std::vector<std::int32_t> _M0;
-  std::vector<std::int32_t> _M1;
-  CUdeviceptr _dM0;
-  CUdeviceptr _dM1;
+  std::vector<std::int32_t> _M;
+  CUdeviceptr _dM;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   const int num_cells = 30;
   const T lower = 0.;
   const T upper = 1.;
-  const int p_order = 3;
+  const int p_order = 5;
 
   auto element = basix::create_element<T>(
       basix::element::family::P, basix::cell::type::tetrahedron, p_order,
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
       basix::element::dpc_variant::unset, false);
 
   auto element_from = basix::create_element<T>(
-      basix::element::family::P, basix::cell::type::tetrahedron, 4,
+      basix::element::family::P, basix::cell::type::tetrahedron, 6,
       basix::element::lagrange_variant::equispaced,
       basix::element::dpc_variant::unset, false);
 
@@ -113,14 +113,15 @@ int main(int argc, char* argv[]) {
 
 
   /* GPU version */
-  coeffs.interpolate(f_from);
+  auto coeffs_from = dolfinx::fem::CUDACoefficient<double>(f_from);
+  coeffs.interpolate(coeffs_from);
   t1 = high_resolution_clock::now();
   for (std::size_t i = 0; i < ITER; i++) {
-    coeffs.interpolate(f_from);
+    coeffs.interpolate(coeffs_from);
   }
   t2 = high_resolution_clock::now();
   ms = t2 - t1;
-  std::cout << "Serial implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
+  std::cout << "GPU implementation: " << ms.count()/(double)ITER << " ms" << std::endl;
   allClose(f_true->x()->array(), coeffs.values());
 
 

@@ -55,9 +55,9 @@ namespace dolfinx::CUDA {
 template<std::floating_point T>
 void d_interpolate_same_map(T* u1,
                             T* u0,
-                            int n0,
-                            int n1, int C,
-                            T* i_m, int* M0, int* M1) {
+                            int n1,
+                            int n0, int C,
+                            T* i_m, int* M1, int* M0) {
 
     T *X0, *X1;
     cudaMalloc((void **)&X0, n0 * C * sizeof(T));
