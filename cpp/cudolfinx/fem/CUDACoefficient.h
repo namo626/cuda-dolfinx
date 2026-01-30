@@ -35,6 +35,11 @@ public:
     CUDA::safeMemAlloc(&_dvalues, _dvalues_size);
     copy_host_values_to_device();
 
+    // Count total no. of cells
+    auto mesh = f->function_space()->mesh();
+    auto map = mesh->topology()->index_map(mesh->topology()->dim());
+    _num_cells = map->size_local() + map->num_ghosts();
+
   }
 
   /// Copy to device, allocating GPU memory if required
@@ -43,6 +48,10 @@ public:
     CUDA::safeMemcpyHtoD(_dvalues, (void*)(_x->array().data()), _dvalues_size);
   }
 
+  void copy_device_values_to_host()
+  {
+    CUDA::safeMemcpyDtoH((void*)_values.data(), _dvalues, _dvalues_size);
+  }
 
   /// Interpolate a Function associated with the same mesh over all cells.
   /// Update host-side coefficient vector.
@@ -53,7 +62,6 @@ public:
       auto element0 = _g->function_space()->element();
       assert(element0);
       auto element1 = _f->function_space()->element();
-      assert(element1);
 
       // Copy DOF vector of g to device
       auto _y = _g->x();
@@ -65,26 +73,23 @@ public:
       auto [x, y] = element1->create_interpolation_operator(*element0);
       _i_m = x;
       _im_shape = y;
-      std::cout << "im_shape[0] = " << _im_shape[0] << std::endl;
-      std::cout << "im_shape[1] = " << _im_shape[1] << std::endl;
+      //std::cout << "im_shape[0] = " << _im_shape[0] << std::endl;
+      //std::cout << "im_shape[1] = " << _im_shape[1] << std::endl;
       CUDA::safeMemAlloc(&_d_i_m, _i_m.size()*sizeof(T));
       CUDA::safeMemcpyHtoD(_d_i_m, (void*)(_i_m.data()), _i_m.size()*sizeof(T));
 
       // Create interpolation mappings once
-      CUDA::create_interpolation_maps(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
+      CUDA::create_interpolation_maps(*_f, *_g, _i_m, _im_shape, _M0, _M1);
 
-      CUDA::safeMemAlloc(&_dof0_mask, _A_star.size()*sizeof(int));
-      CUDA::safeMemAlloc(&_dof1_mask, _B_star.size()*sizeof(int));
-      CUDA::safeMemcpyHtoD(_dof0_mask, (void*)(_A_star.data()), _A_star.size()*sizeof(int));
-      CUDA::safeMemcpyHtoD(_dof1_mask, (void*)(_B_star.data()), _B_star.size()*sizeof(int));
+      CUDA::safeMemAlloc(&_dM0, _M0.size()*sizeof(int));
+      CUDA::safeMemAlloc(&_dM1, _M1.size()*sizeof(int));
+      CUDA::safeMemcpyHtoD(_dM0, (void*)(_M0.data()), _M0.size()*sizeof(int));
+      CUDA::safeMemcpyHtoD(_dM1, (void*)(_M1.data()), _M1.size()*sizeof(int));
       
     }
 
-    //CUDA::interpolate_same_map(*_f, *_g, _i_m, _im_shape, _A_star, _B_star);
-    std::vector<T> output;
-    CUDA::cuda_interpolate_same_map(*_f, *_g, _dvalues, _dvalues_size, _dvalues_g, _d_i_m, _im_shape, _dof0_mask,
-                                    _dof1_mask, output);
-    _values = output;
+    CUDA::interpolate_same_map<T>(_dvalues, _dvalues_g, _im_shape, _num_cells, _d_i_m, _dM0, _dM1);
+    copy_device_values_to_host();
   }
 
 
@@ -115,7 +120,8 @@ private:
   // Pointer to host-side coefficient vector
   std::shared_ptr<const dolfinx::la::Vector<T>> _x;
 
-
+  // Total number of cells
+  size_t _num_cells;
 
   std::shared_ptr<dolfinx::fem::Function<T, U>> _g;
   CUdeviceptr _dvalues_g;
@@ -126,10 +132,10 @@ private:
   CUdeviceptr _d_i_m;
 
   // Interpolation maps
-  std::vector<std::int32_t> _A_star;
-  std::vector<std::int32_t> _B_star;
-  CUdeviceptr _dof0_mask;
-  CUdeviceptr _dof1_mask;
+  std::vector<std::int32_t> _M0;
+  std::vector<std::int32_t> _M1;
+  CUdeviceptr _dM0;
+  CUdeviceptr _dM1;
 };
 
 template class dolfinx::fem::CUDACoefficient<double>;

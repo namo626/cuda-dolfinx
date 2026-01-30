@@ -13,37 +13,27 @@
 namespace dolfinx::CUDA {
 
 template<std::floating_point T>
-void wrapper_cuda_interpolate_same_map(int P, int K, int C, CUdeviceptr _x,
-                                       CUdeviceptr _y, CUdeviceptr i_m,
-                                       CUdeviceptr dofs0_map,
-                                       CUdeviceptr dofs1_map, int dvalues_size,
-                                       std::array<std::size_t, 2> im_shape,
-                                       std::vector<T> &output);
+void d_interpolate_same_map(T* u1,
+                            T* u0,
+                            int n0,
+                            int n1, int C,
+                            T* i_m, int* M0, int* M1);
 
 template<std::floating_point T>
-void interpolate_same_map(const dolfinx::fem::Function<T, T> &u1,
-                               const dolfinx::fem::Function<T, T> &u0,
-                               CUdeviceptr _x,
-                               int dvalues_size,
-                               CUdeviceptr _y,
-                               CUdeviceptr i_m,
-                               std::array<std::size_t, 2> im_shape,
-                               CUdeviceptr dofs0_map, CUdeviceptr dofs1_map,
-                               std::vector<T>& output) {
+void interpolate_same_map(
+                          CUdeviceptr ux1,
+                          CUdeviceptr ux0,
+                          std::array<std::size_t, 2> im_shape,
+                          std::size_t num_cells,
+                          CUdeviceptr i_m,
+                          CUdeviceptr M0,
+                          CUdeviceptr M1) {
 
-  auto V0 = u0.function_space();
-  auto V1 = u1.function_space();
-  auto mesh0 = V0->mesh();
-  const int tdim = mesh0->topology()->dim();
-  auto map = mesh0->topology()->index_map(tdim);
 
-  // Get all cells
-  std::vector<std::int32_t> cells(map->size_local() + map->num_ghosts(), 0);
-  const std::size_t P = im_shape[0];
-  const std::size_t K = im_shape[1];
-  const std::size_t C = cells.size();
+  const std::size_t n1 = im_shape[0];
+  const std::size_t n0 = im_shape[1];
 
-  wrapper_cuda_interpolate_same_map(P,K,C, _x,_y,i_m,dofs0_map, dofs1_map, dvalues_size, im_shape, output);
+  d_interpolate_same_map<T>((T*)ux1, (T*)ux0, n0, n1, num_cells, (T*)i_m, (int*)M0, (int*)M1);
 }
 
 template <dolfinx::scalar T, std::floating_point U>
