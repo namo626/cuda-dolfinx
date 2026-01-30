@@ -79,8 +79,10 @@ public:
       CUDA::safeMemcpyHtoD(_d_i_m, (void*)(_i_m.data()), _i_m.size()*sizeof(T));
 
       // Create interpolation mappings once
-      CUDA::create_interpolation_maps(*_f, *_g, _i_m, _im_shape, _M0, _M1);
+      _M0 = CUDA::create_interpolation_map(*_g);
+      _M1 = CUDA::create_interpolation_map(*_f);
 
+      // Copy interpolation maps to device
       CUDA::safeMemAlloc(&_dM0, _M0.size()*sizeof(int));
       CUDA::safeMemAlloc(&_dM1, _M1.size()*sizeof(int));
       CUDA::safeMemcpyHtoD(_dM0, (void*)(_M0.data()), _M0.size()*sizeof(int));
@@ -93,7 +95,7 @@ public:
   }
 
 
-  /// Return a copy of coefficient vector
+  /// Return a copy of host-side coefficient vector
   std::vector<T> values() const {
     return _values;
   }

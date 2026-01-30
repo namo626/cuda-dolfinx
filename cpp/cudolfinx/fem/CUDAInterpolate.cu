@@ -3,10 +3,6 @@
 #include <array>
 #include <concepts>
 
-__device__ double func(double x, double y, double z) {
-    return 1. + 0.1*x*x + 0.2*y*y + 0.3*z*z;
-}
-
 // Assign A with entries of B as specified in M.
 // A and M are of size n.
 template<std::floating_point T>
@@ -82,4 +78,5 @@ void d_interpolate_same_map(T* u1,
 }
 
     template void d_interpolate_same_map<double>(double*, double*, int, int, int, double*, int*, int*);
+    template void d_interpolate_same_map<float>(float*, float*, int, int, int, float*, int*, int*);
 }
