@@ -58,7 +58,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     cmake \
     g++ \
     gfortran \
-    libboost-dev \
+    libboost-all-dev \
     liblapack-dev \
     libopenblas-dev \
     libpugixml-dev \
@@ -141,7 +141,8 @@ ENV PETSC_OPTIONS="-use_gpu_aware_mpi 0" \
     PATH=/usr/local/bin:$PATH
 
 # Install Python packages (via pip)
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+RUN pip install --no-cache-dir --upgrade pip wheel && \
+    pip install 'setuptools<81.0.0' && \
     pip install --no-cache-dir cython numpy==${NUMPY_VERSION} && \
     pip install --no-cache-dir mpi4py
 
